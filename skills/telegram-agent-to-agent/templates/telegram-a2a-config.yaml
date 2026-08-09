@@ -1,0 +1,34 @@
+# Annotated gateway config for the Telegram Agent-to-Agent Bridge.
+# Apply the relevant parts on BOTH machines, then restart each gateway.
+#
+# Replace placeholders:
+#   - YOUR_BOT_TOKEN        -> this machine's bot token (goes in .env, not here)
+#   - -1001234567890        -> your group's chat ID (from getUpdates after migration)
+#   - @Agent_A / @Agent_B   -> your two bot usernames
+
+# .env (per machine, NOT committed anywhere):
+#   TELEGRAM_BOT_TOKEN=<YOUR_BOT_TOKEN>
+
+# config.yaml (per machine):
+telegram:
+  # Bots may trigger the agent, but only via a mention.
+  allow_bots: mentions
+  # Never respond to unaddressed messages.
+  require_mention: true
+  # Only YOUR bot's mention triggers the agent (not the other bot's).
+  exclusive_bot_mentions: true
+  # Only the group may reach the agent; nothing else is accepted.
+  allowed_chats: '-1001234567890'
+  # Optional: observe the whole room without acting on unaddressed messages.
+  observe_unmentioned_group_messages: true
+
+# Reliability: deliver complete messages instead of streaming previews.
+# On agent-to-agent channels a partial preview ending in the cursor (▉)
+# is indistinguishable from a real truncation.
+streaming:
+  enabled: false
+  transport: auto
+  edit_interval: 0.8
+  buffer_threshold: 24
+  cursor: ' ▉'
+  fresh_final_after_seconds: 0.0
