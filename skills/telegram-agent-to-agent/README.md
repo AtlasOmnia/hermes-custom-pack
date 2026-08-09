@@ -2,7 +2,7 @@
 
 Let two Hermes agents on different machines talk through a Telegram group — with the protocol rules that keep them from looping forever.
 
-![Telegram A2A bridge diagram](https://raw.githubusercontent.com/AtlasOmnia/hermes-agent-custom-pack/main/assets/telegram-agent-to-agent.svg)
+![Telegram A2A bridge diagram](https://raw.githubusercontent.com/AtlasOmnia/hermes-custom-pack/main/assets/telegram-agent-to-agent.svg)
 
 The group is the transport **and** the audit log: every handoff is visible to the human, agents act only when addressed by their literal bot mention, and a set of anti-loop rules (acknowledgment suppression, one bounded retry, hold semantics) stops acknowledgment ping-pong before it starts.
 
@@ -26,7 +26,7 @@ No scripts or third-party packages required. You only need two bot tokens from [
 Install the agent instructions only:
 
 ```bash
-hermes skills install https://raw.githubusercontent.com/AtlasOmnia/hermes-agent-custom-pack/main/skills/telegram-agent-to-agent/SKILL.md
+hermes skills install https://raw.githubusercontent.com/AtlasOmnia/hermes-custom-pack/main/skills/telegram-agent-to-agent/SKILL.md
 ```
 
 For the config template, copy the full package:
@@ -34,13 +34,13 @@ For the config template, copy the full package:
 macOS/Linux:
 
 ```bash
-curl -O https://raw.githubusercontent.com/AtlasOmnia/hermes-agent-custom-pack/main/skills/telegram-agent-to-agent/templates/telegram-a2a-config.yaml
+curl -O https://raw.githubusercontent.com/AtlasOmnia/hermes-custom-pack/main/skills/telegram-agent-to-agent/templates/telegram-a2a-config.yaml
 ```
 
 Windows PowerShell:
 
 ```powershell
-Invoke-WebRequest -OutFile telegram-a2a-config.yaml https://raw.githubusercontent.com/AtlasOmnia/hermes-agent-custom-pack/main/skills/telegram-agent-to-agent/templates/telegram-a2a-config.yaml
+Invoke-WebRequest -OutFile telegram-a2a-config.yaml https://raw.githubusercontent.com/AtlasOmnia/hermes-custom-pack/main/skills/telegram-agent-to-agent/templates/telegram-a2a-config.yaml
 ```
 
 ## One-time setup (summary)
