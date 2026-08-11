@@ -1,6 +1,6 @@
 ---
 name: reddit-browse-and-post
-description: reddit-browse-and-post — Browse Reddit, search, read threads and comments, and create posts through the agent's own authenticated session or OAuth app. Account-agnostic; no credentials in the skill.
+description: reddit-browse-and-post — Read-only Reddit browsing, search, and thread reading by default; publishing is an explicit, separately approved opt-in through the user's authenticated session or OAuth app. Account-agnostic; no credentials in the skill.
 platforms:
 - linux
 - macos
@@ -14,7 +14,13 @@ triggers:
 ---
 # Reddit Browse & Post
 
-Let an agent read Reddit and publish posts using the user's own Reddit account. Everything here is account-agnostic: the user supplies their credentials through environment variables or a browser login, never through chat.
+Let an agent read Reddit by default, and publish only after the user explicitly opts in and approves the exact post. Everything here is account-agnostic: the user supplies credentials through environment variables or a browser login, never through chat.
+
+## Default mode: read-only
+
+Browsing, searching, and reading threads/comments are the default capabilities. They do not require a paid service, MCP, Reddit account, or OAuth app when the public JSON endpoints are reachable.
+
+Posting, editing, deleting, voting, and moderator actions are separate write paths. Do not expose or invoke them merely because this skill is installed: require an explicit user request plus approval of the exact destination and content.
 
 ## Hard rules
 
@@ -23,6 +29,7 @@ Let an agent read Reddit and publish posts using the user's own Reddit account. 
 - **Never edit, delete, vote, or mod-queue anything without explicit approval.**
 - Respect subreddit rules: read the sidebar / rules (or `about/rules.json`) before posting to a subreddit you have not posted to.
 - Respect rate limits: keep requests under ~1/second for reads; wait at least a minute between post attempts. Respect 429/403 responses and back off.
+- Respect Reddit's User Agreement, Developer Terms, and robots/access restrictions. Do not bulk-harvest content or evade access controls.
 - Do not post spam, affiliate links, or promotional content unless the user explicitly directs it.
 - Vote manipulation, ban evasion, and buying/selling accounts are off-limits.
 
@@ -32,7 +39,7 @@ Reddit's public JSON endpoints (`/r/<sub>/.json`, `/search.json`, `/comments/<id
 
 Reliable paths, in order:
 
-1. **Authenticated API** (recommended — works from any network): get an OAuth token (setup below) and read through `https://oauth.reddit.com` with `Authorization: bearer $TOKEN`. Same endpoints, dramatically higher rate limits, and it doubles as the posting path.
+1. **Authenticated API** (recommended when public JSON is blocked — works from any network): get an OAuth token (setup below) and read through `https://oauth.reddit.com` with `Authorization: bearer ***`. Same endpoints, dramatically higher rate limits, and it doubles as the separately approved posting path.
 2. **Hermes browser tools** — navigate to the target page; the browser session passes Reddit's checks. Good for JS-gated pages and logged-in work.
 
 If a plain-curl probe does work from the user's network:
@@ -52,7 +59,7 @@ curl -s -A "hermes-agent/1.0 by <username>" "https://www.reddit.com/r/<subreddit
 ```
 
 Tips:
-- **Always send a unique, descriptive User-Agent** — Reddit blocks generic clients (e.g. `python-requests`) aggressively.
+- **Always send a unique, descriptive User-Agent** (for example `hermes-agent/1.0 by <username>`) — a generic or browser-spoofed client string is not a reliable access strategy and Reddit may still block the network/IP.
 - Prefer `old.reddit.com` for JSON stability if a request is blocked or returns HTML.
 - `limit` max is 100. Paginate with `after=<fullname>` (e.g. `t3_abc123`).
 - If a listing returns 403/429, wait several seconds and retry once; then fall back to the OAuth or browser path.
