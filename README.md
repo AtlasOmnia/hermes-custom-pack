@@ -92,8 +92,7 @@ Additional packages will be added only after they are generalized, tested, and c
 
 Autonomous agent loops are separate projects, not skills in this pack:
 
-- **[hermes-autoresearch](https://github.com/AtlasOmnia/hermes-autoresearch)** — Karpathy-style propose→test→keep/revert harness for repository experiments.
-- **[hermes-health-improvement-loops](https://github.com/AtlasOmnia/hermes-health-improvement-loops)** — Read-only Hermes health auditing and suggestion-only improvement loops.
+- **[hermes-loops](https://github.com/AtlasOmnia/hermes-loops)** — the autoresearch propose→test→keep/revert harness and the read-only health/improvement maintenance loops, in one monorepo.
 
 See the [AtlasOmnia front page](https://github.com/AtlasOmnia/AtlasOmnia) for the full catalog, including plugins, profiles, and community guides.
 
