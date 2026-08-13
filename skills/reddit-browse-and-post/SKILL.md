@@ -20,7 +20,7 @@ Let an agent read Reddit by default, and publish only after the user explicitly 
 
 Browsing, searching, and reading threads/comments are the default capabilities. They do not require a paid service, MCP, Reddit account, or OAuth app when the public JSON endpoints are reachable.
 
-Posting, editing, deleting, voting, and moderator actions are separate write paths. Do not expose or invoke them merely because this skill is installed: require an explicit user request plus approval of the exact destination and content.
+Posting, editing, deleting, voting, and moderator actions are separate write paths. Do not expose or invoke them merely because this skill is installed: require an explicit user request and approval of the exact action and target; for publishing, also require approval of the exact destination and content.
 
 ## Hard rules
 
