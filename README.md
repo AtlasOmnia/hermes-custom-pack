@@ -41,7 +41,6 @@ This repository is unofficial and is not affiliated with or endorsed by Nous Res
 | [google-workspace](skills/google-workspace/) | Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python | Ready |
 | [hermes-agent](skills/hermes-agent/) | Configure, extend, or contribute to Hermes Agent | Ready |
 | [hermes-agent-skill-authoring](skills/hermes-agent-skill-authoring/) | Author in-repo SKILL.md: frontmatter, validator, structure | Ready |
-| [hermes-autoresearch-loops](skills/hermes-autoresearch-loops/) | Karpathy-style autoresearch loops for Hermes: autonomous propose→test→keep/revert cycles for config tuning, infra hardening, skill improvement, and post-update safety checks | Ready |
 | [hermes-config-editing](skills/hermes-config-editing/) | Edit Hermes Agent configuration values — settings, compression, model config — with reliable patterns that work around security guards and CLI quirks | Ready |
 | [hermes-context-optimization](skills/hermes-context-optimization/) | Optimize Hermes startup/context payloads, compression, tool-schema loading, memory/skill injection, and visual-context experiments | Ready |
 | [hermes-desktop-plugins](skills/hermes-desktop-plugins/) | Write desktop app plugins that add UI panes and commands | Ready |
@@ -88,6 +87,15 @@ This repository is unofficial and is not affiliated with or endorsed by Nous Res
 | [vault-organization](skills/vault-organization/) | Structure a new Obsidian vault (PARA taxonomy, MOCs, starter folder tree) and audit/clean up/reorganize an existing one — identify bloat, consolidate duplicates, remove empty shells, update MOCs and stale references | Ready |
 | [xurl](skills/xurl/) | X/Twitter via xurl CLI: post, search, DM, media, v2 API | Ready |
 Additional packages will be added only after they are generalized, tested, and cleared of private configuration.
+
+## Related projects
+
+Autonomous agent loops are separate projects, not skills in this pack:
+
+- **[hermes-autoresearch](https://github.com/AtlasOmnia/hermes-autoresearch)** — Karpathy-style propose→test→keep/revert harness for repository experiments.
+- **[hermes-health-improvement-loops](https://github.com/AtlasOmnia/hermes-health-improvement-loops)** — Read-only Hermes health auditing and suggestion-only improvement loops.
+
+See the [AtlasOmnia front page](https://github.com/AtlasOmnia/AtlasOmnia) for the full catalog, including plugins, profiles, and community guides.
 
 ## Install a skill
 
