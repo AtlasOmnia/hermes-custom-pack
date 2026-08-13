@@ -17,7 +17,7 @@ metadata:
 
 Review the user's own Hermes session history, read-only, to find recurring mistakes, failed tool calls, and problems the user had to re-fix or re-explain. Turn the findings into a suggestion-only report plus proposed reusable skills. Nothing is ever applied automatically: every change stays human-gated.
 
-This skill is the reasoning half of a diagnostic-review loop. The deterministic companion `hermes-health-loops improvement` CLI (in the `hermes-loops` package) accepts an explicitly supplied outcome packet and emits suggestion-only records from a frozen classification rubric. It does not score, keep, or revert anything. This skill does the collection and judgment; the CLI is an optional downstream recorder, not the review's gate.
+This skill is the reasoning half of a diagnostic-review loop. The deterministic companion `hermes-maintenance-loops improvement` CLI (in the `hermes-loops` package) accepts an explicitly supplied outcome packet and emits suggestion-only records from a frozen classification rubric. It does not score, keep, or revert anything. This skill does the collection and judgment; the CLI is an optional downstream recorder, not the review's gate.
 
 ## When to Use
 
@@ -85,10 +85,10 @@ Every proposal cites the distinct qualifying sessions (redacted aliases and time
 
 ## Recurring loop (optional)
 
-For users who want this unattended, the pattern is a daily read-only collector that turns new sessions into a redacted outcome packet, then a frozen classifier that applies its rubric and emits suggestion-only records. The classifier half ships as the `hermes-health-loops improvement` CLI:
+For users who want this unattended, the pattern is a daily read-only collector that turns new sessions into a redacted outcome packet, then a frozen classifier that applies its rubric and emits suggestion-only records. The classifier half ships as the `hermes-maintenance-loops improvement` CLI:
 
 ```bash
-hermes-health-loops improvement --source outcomes.json --runtime-dir path/to/runtime
+hermes-maintenance-loops improvement --source outcomes.json --runtime-dir path/to/runtime
 ```
 
 Keep the promotion rule above as the review's gate and the same human gate for any change. A cron job may collect and classify, but it must never apply, schedule, publish, or deliver anything.
