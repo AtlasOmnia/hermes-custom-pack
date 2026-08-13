@@ -15,73 +15,57 @@ metadata:
 
 ## Overview
 
-This public operating playbook explains safe use and interpretation of the Hermes Health Improvement Loops companion project. It is not the executable implementation, a copied check inventory, Hermes documentation, or authority to change Hermes.
+This public playbook covers safe use and interpretation of the Hermes Health Improvement Loops companion project. It is not the implementation, a copied check inventory, Hermes documentation, or authority to change Hermes.
 
 Public sources of truth:
 
 - Project: https://github.com/AtlasOmnia/hermes-health-improvement-loops
-- Current health-check matrix: https://github.com/AtlasOmnia/hermes-health-improvement-loops/blob/main/docs/health-check-matrix.md
+- Matrix: https://github.com/AtlasOmnia/hermes-health-improvement-loops/blob/main/docs/health-check-matrix.md
 
-Use the public project and matrix for exact implementation behavior, supported surfaces, limits, schemas, release changes, and implementation-level verification. This skill routes code-level detail and the exact inventory to those sources rather than duplicating them. If this playbook and the public project differ, consult the current public implementation and matrix, while still applying this safety boundary.
+Use those sources for exact behavior, supported surfaces, limits, schemas, release changes, and implementation verification. This skill routes code-level detail and the exact inventory there instead of duplicating them. If sources differ, consult the current public implementation and matrix while applying this safety boundary.
 
-The project has two independent lanes:
-
-- **Health:** bounded, read-only checks against an operator-selected Hermes home.
-- **Improvement:** evaluation of one explicitly supplied outcome packet, producing a suggestion for human review.
-
-An optional report may display already-produced results together. Presentation does not join the lanes’ inputs, discovery, credentials, runtime authority, configuration control, scheduler control, or delivery authority. This skill is generic: it chooses no model, provider, route, host, transport, schedule, delivery target, profile, account, or default home, and contains no credentials or private operating procedure.
+The project has two independent lanes: **health**, which performs bounded read-only checks against an operator-selected Hermes home, and **improvement**, which evaluates one explicitly supplied outcome packet and produces a suggestion for human review. A report may display existing results together, but never joins their inputs, discovery, credentials, runtime, configuration, scheduler, or delivery authority. This skill chooses no model, provider, route, host, transport, schedule, delivery target, profile, account, or default home.
 
 ## When to Use
 
-Use this skill to:
+Use this skill for bounded Hermes health audits, supported-surface status interpretation, evaluation of explicit repeated outcomes, review-packet preparation, current-matrix inspection, or explaining why a suggestion must not automatically change Hermes.
 
-- perform a bounded Hermes health audit without changing the installation;
-- understand whether a supported surface is healthy, degraded, unavailable, unknown, or not observed;
-- evaluate explicit outcomes for a repeated failure or quality pattern;
-- prepare a review packet for possible improvement work;
-- inspect the public matrix to understand available evidence; or
-- explain why an improvement suggestion must not automatically change Hermes.
+Do not use it to mutate Hermes, discover unsupplied outcome sources, treat health as repair permission, treat a suggestion as approval, use remembered CLI syntax, or call missing, inaccessible, malformed, stale, unsupported, or ambiguous evidence healthy.
 
-Do not use it as authority to change Hermes configuration, skills, memory, sessions, scheduler state, credentials, providers, models, routes, hosts, or delivery; discover or crawl unsupplied outcome sources; treat health as permission to repair, restart, reconfigure, or publish; treat a suggestion as an approved change; replace current CLI help with remembered syntax; or call a missing, inaccessible, malformed, stale, unsupported, or ambiguous surface healthy.
-
-If implementation, mutation, scheduling, or publication is requested, stop at that boundary and obtain separately scoped approval. Before any Hermes mutation or operational advice that could mutate Hermes, load `hermes-agent`, consult current Hermes documentation, and verify the live command surface. This companion project remains read-only/audit and suggestion-only unless a separately reviewed and authorized integration says otherwise.
+If implementation, mutation, scheduling, or publication is requested, stop and obtain separately scoped approval. Before any Hermes mutation or mutation-capable operational advice, load `hermes-agent`, consult current Hermes documentation, and verify the live command surface. The companion project remains read-only/audit and suggestion-only unless separately reviewed and authorized.
 
 ## Safety and authority boundary
 
 ### Authority levels
 
-Apply these levels in order:
+1. **Observation:** read bounded data from an explicit Hermes home or outcome packet.
+2. **Evaluation:** classify evidence or evaluate a redacted packet under current rules.
+3. **Suggestion:** describe a possible improvement for human review.
+4. **Mutation:** change Hermes or an external system. This skill grants none.
 
-1. **Observation:** read bounded, permitted data from an explicit operator-selected Hermes home or explicit outcome packet.
-2. **Evaluation:** classify observed evidence or evaluate a redacted packet under current project rules.
-3. **Suggestion:** describe a possible improvement for a person to review.
-4. **Mutation:** change Hermes, its configuration, its scheduler, or an external system. This skill grants none.
-
-Normal operation stops at suggestion authority. A health check, repeated outcome, or report never grants mutation authority. A person must make the separate decision, define the exact target and allowlist, authorize the mutation, and use the appropriate Hermes procedure.
+Normal operation stops at suggestion authority. A check, repeated outcome, or report never grants mutation authority. A person must define the exact target and allowlist, authorize the mutation, and use the proper Hermes procedure.
 
 ### Read-only health
 
-Health may inspect only bounded, supported surfaces through the public implementation. It must not write to the selected Hermes home, update files in place, alter a database, prune history, rotate credentials, restart a service, create scheduler state, or repair a condition. If a tool or wrapper unexpectedly attempts a write, treat that as a failure and stop; do not broaden authorization.
+Health inspects only bounded, supported surfaces through the public implementation. It must not write to the selected home, update files, alter databases, prune history, rotate credentials, restart services, create scheduler state, or repair a condition. If a tool attempts a write, stop and treat it as failure.
 
-Require an explicit operator-selected Hermes home. Do not silently substitute a default, search other homes, recursively crawl unrelated paths, or turn a missing optional file into a repair request. Keep the probe bounded and preserve which surfaces were observed.
+Require an explicit operator-selected home. Do not substitute a default, search other homes, crawl unrelated paths, or turn missing optional evidence into a repair request. Keep the probe bounded and preserve which surfaces were observed.
 
 ### Suggestion-only improvement
 
-Improvement consumes only one explicitly supplied outcome packet or fixture. It must not search a Hermes home, crawl transcripts, infer private sources, harvest memory, search sessions, or silently broaden its input set. Review the packet for sensitivity. Redaction reduces exposure; it does not prove that every personal or secret-like value was removed.
+Improvement consumes only one explicitly supplied outcome packet or fixture. It must not search a Hermes home, crawl transcripts, infer private sources, harvest memory, search sessions, or broaden its input. Review sensitivity first; redaction reduces exposure but does not prove all personal or secret-like values were removed.
 
-The evaluator may identify a notable, repeated, or actionable pattern under the current public rubric. Its output is a suggestion or review finding, never a patch, approval, schedule, deployment, release, rollback, or automatic change. Keep enough provenance for review without exposing unnecessary sensitive content.
+The evaluator may identify a pattern under the current public rubric. Its output is a suggestion, never a patch, approval, schedule, deployment, release, rollback, or automatic change. Preserve enough provenance for review without unnecessary sensitive content.
 
 ### Human-only review
 
-A human must review the evidence, classification, proposed direction, affected boundary, and expected risk before any experiment or change. The reviewer decides whether to reject, defer, investigate, or authorize a separately scoped mutation. No suggestion may trigger an agent, scheduler, configuration or skill edit, provider/model change, route/delivery change, restart, or publication.
+A human reviews evidence, classification, proposed direction, affected boundary, and risk before any experiment or change, deciding whether to reject, defer, investigate, or authorize a separately scoped mutation. A suggestion may not trigger an agent, scheduler, configuration or skill edit, provider/model change, route/delivery change, restart, or publication.
 
-A human must also decide whether a report is appropriate to share. Reports can contain operational facts even when redaction is enabled. Never publish a raw report merely because a command completed successfully.
+A human also decides whether a report is shareable. Reports can contain operational facts even with redaction; successful completion is not permission to publish raw output.
 
 ### Hermes guidance and current CLI help
 
-Before changing Hermes, installed skills, configuration, scheduler, or runtime, load `hermes-agent` and consult current Hermes documentation. Verify the live command surface rather than relying on this playbook or remembered syntax.
-
-For any separately approved task that renders or proposes a Hermes command, inspect current CLI help for the installed version and relevant subcommand first. Render only syntax confirmed by that help. This skill intentionally does not freeze scheduler flags or provide a cron recipe. Current help is required before command rendering, even when a command appears obvious or low risk.
+Before changing Hermes, installed skills, configuration, scheduler, or runtime, load `hermes-agent`, consult current documentation, and verify the live command surface. For any separately approved command-rendering task, inspect current CLI help for the installed version and relevant subcommand first. Render only syntax confirmed by that help; this skill does not freeze scheduler flags or provide a cron recipe.
 
 ## Operating flow
 
@@ -89,53 +73,31 @@ Keep health and improvement as two transactions with separate inputs, permission
 
 ### 1. Establish the boundary
 
-Confirm that the request is an audit, evaluation, or report—not an instruction to repair Hermes. Identify the explicit operator-selected Hermes home for health, the explicit outcome packet for improvement, and an external runtime destination for package-owned outputs if needed.
+Confirm the request is an audit, evaluation, or report—not repair. Identify the explicit operator-selected home, explicit outcome packet, and external runtime destination if needed. If target or packet is absent, report the missing input and stop that lane; never substitute an implicit home, guessed packet, session search, transcript crawl, live source, or other discovery. Record `health`, `improvement`, or `report` before execution.
 
-If the target or packet is absent, report the missing input and stop that lane. Do not substitute an implicit home, guessed packet, session search, transcript crawl, live source, or other discovery. Record one lane before execution:
+### 2. Inspect the current contract
 
-- `health`: selected home, bounded read-only probe, and external result destination if applicable;
-- `improvement`: explicit packet, redaction/evaluation, and external result destination if applicable; or
-- `report`: already-produced health and improvement results, with no new authority.
+Open the current public matrix before interpreting a check-dependent result. It is authoritative for categories, inputs, limits, and statuses; do not copy implementation inventory here or treat old reports as current. Inspect current Hermes CLI help whenever syntax is involved; do not render scheduler, installation, or other operational commands from memory.
 
-### 2. Inspect the current public contract
+### 3. Render before applying
 
-Open the current public health-check matrix before interpreting a result that depends on a particular check. It is the authoritative inventory of supported categories, inputs, limits, and expected statuses. Do not copy implementation-level inventory into this skill or treat an old report or prompt as current.
+If a manifest or setup renderer exists, use dry-run/render-only first. A rendered proposal is an inspection artifact, not proof of installation, service state, or external success. Verify boundaries before any separately approved step; model, provider, delivery, schedule, route, and host remain explicit operator inputs.
 
-Inspect current Hermes CLI help whenever a task touches command syntax. Help is version-sensitive. Do not render a scheduler, installation, or other operational command from memory when current help can answer it.
+### 4. Run health
 
-### 3. Render before applying anything
+Run only against the explicit home. Use the public implementation and matrix for complete inventory, limits, and semantics. Keep probes bounded and read-only; do not recurse, copy credentials, private memories, raw transcripts, or profiles into reports, or turn warning/unavailable into repair.
 
-If the public implementation offers a manifest or setup renderer, use dry-run or render-only mode first. The safe default is a reviewable manifest or command proposal without changing Hermes files or creating scheduler state.
+### 5. Run improvement
 
-A rendered manifest is an inspection artifact. It does not prove a job was installed, a service is running, or an external action succeeded. Verify its inputs and boundaries before considering any separately approved next step. Model, provider, delivery, schedule, route, host, and similar values remain explicit operator inputs; this skill chooses none of them.
+Provide one explicit packet or fixture prepared under current public rules. Evaluate only that material, preserve useful provenance, and treat every suggestion as a hypothesis. Check representativeness, repetition, scope fit, and safety conflict; human review remains required.
 
-### 4. Run the health lane
+### 6. Keep runtime external
 
-Run the bounded health audit only against the explicit Hermes home. Use the public implementation and current matrix for the complete check inventory, limits, and semantics. Typical evidence may include metadata, bounded structured-state parsing, selected log checks, supported read-only SQLite access, and accessibility needed to explain an unavailable surface; these examples do not replace the matrix.
+Write package-owned ledgers, reports, or other artifacts only to an explicit external runtime directory supported by the implementation. Keep source, Hermes home, packet, and runtime separate. A package ledger is not Hermes configuration.
 
-Do not expand a bounded probe into a recursive crawl. Do not copy credentials, authentication material, private memories, raw transcripts, or personal profiles into a report. Do not turn a warning or unavailable result into an instruction to repair.
+### 7. Report and stop
 
-### 5. Run the improvement lane
-
-Provide one explicit outcome packet or fixture. Confirm that it is the intended input, suitable for the review boundary, and prepared according to the public implementation’s current rules. The lane evaluates only that supplied material.
-
-Preserve enough provenance for review without unnecessary sensitive content. Treat every suggestion as a hypothesis anchored to the packet and current rubric. Check that the evidence is representative, the fingerprint genuinely repeated, the proposed scope matches the evidence, and the suggestion does not conflict with a safety boundary. It remains non-authoritative until human review.
-
-### 6. Keep runtime state external
-
-Write package-owned ledgers, reports, or other runtime artifacts only to an explicit external runtime directory supported by the implementation. Keep source, selected Hermes home, outcome packet, and runtime artifacts separate where practical. A package ledger or suggestion history is not Hermes configuration and must not be placed into Hermes configuration.
-
-If a default runtime location is offered, verify it from current public documentation and treat it as an implementation detail—not permission to write elsewhere or a substitute for a scoped sensitive-audit boundary.
-
-### 7. Produce an optional report
-
-A report may place independently produced health and improvement results side by side. Preserve lane identity, input provenance, implementation-supplied run identifiers, and failure state. It must not imply that health validated improvement, improvement discovered health evidence, or either lane approved a change.
-
-If either lane fails, is unavailable, or is unknown, preserve that state. Never summarize a mixed report as healthy because one section passed. A report is presentation only and adds no authority.
-
-### 8. Stop at human review
-
-Deliver the result for human review. If the reviewer wants a change, open a new, separately scoped Hermes task with an explicit target, allowed files or settings, rollback plan, and verification plan. Load `hermes-agent`, inspect current documentation and CLI help, and apply the appropriate mutation gates for that new task.
+A report may place independent results side by side while preserving lane identity, provenance, run identifiers, and failure state. It adds no authority. Preserve failure, unavailable, and unknown states; never call a mixed report healthy because one section passed. Deliver for human review. Any desired change requires a new scoped task with target, allowlist, rollback, verification plan, `hermes-agent`, current documentation, and current CLI help.
 
 ## Interpreting results
 
@@ -165,7 +127,7 @@ Report the earliest and most specific layer supported by evidence. A pre-dispatc
 
 ### Evidence before conclusions
 
-Keep these claims separate and verify each from appropriate evidence: the request was accepted; the lane executed; a specific check passed; a result was written to external runtime state; a result was delivered to a reviewer; and a human approved a next action. Process exit zero alone proves none of these beyond the process’s own reported completion.
+Keep acceptance, execution, check status, external write, delivery, and human approval as separate claims. Verify each from the appropriate evidence; process exit zero alone proves none of them beyond the process’s own completion.
 
 ## Common Pitfalls
 
