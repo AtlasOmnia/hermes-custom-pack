@@ -1,6 +1,6 @@
 ---
-name: hermes-session-review
-description: "Use when reviewing recent Hermes sessions read-only to find recurring mistakes, failed tool calls, and repeated fixes, then propose suggestion-only improvements and reusable skills. Human-gated; never auto-applies."
+name: hermes-diagnostic-review
+description: "Use when running a read-only diagnostic review of recent Hermes sessions to find recurring mistakes, failed tool calls, and repeated fixes, then propose suggestion-only improvements and reusable skills. Human-gated; never auto-applies."
 version: 1.0.0
 author: AtlasOmnia
 license: MIT
@@ -11,13 +11,13 @@ metadata:
     related_skills: [hermes-agent, hermes-self-evaluation, hermes-session-maintenance]
 ---
 
-# Hermes Session Review
+# Hermes Diagnostic Review
 
 ## Overview
 
 Review the user's own Hermes session history, read-only, to find recurring mistakes, failed tool calls, and problems the user had to re-fix or re-explain. Turn the findings into a suggestion-only report plus proposed reusable skills. Nothing is ever applied automatically: every change stays human-gated.
 
-This skill is the reasoning half of a session-review loop. The deterministic companion `hermes-health-loops improvement` CLI (in the `hermes-loops` package) accepts an explicitly supplied outcome packet and emits suggestion-only records from a frozen classification rubric. It does not score, keep, or revert anything. This skill does the collection and judgment; the CLI is an optional downstream recorder, not the review's gate.
+This skill is the reasoning half of a diagnostic-review loop. The deterministic companion `hermes-health-loops improvement` CLI (in the `hermes-loops` package) accepts an explicitly supplied outcome packet and emits suggestion-only records from a frozen classification rubric. It does not score, keep, or revert anything. This skill does the collection and judgment; the CLI is an optional downstream recorder, not the review's gate.
 
 ## When to Use
 
