@@ -1,11 +1,15 @@
-#!/usr/bin/env python3
-"""Validate every Hermes skill package in this collection."""
-
 from __future__ import annotations
+
+"""Validate SKILL.md packages and their public support-file manifests.
+
+The manifest is the package contract: every support file physically shipped under
+an individual skill package must be named in a Support/References section, and
+every explicitly named relative support path must exist. Source-tree commands,
+URLs, wildcard examples, and cross-skill prose are intentionally ignored.
+"""
 
 from pathlib import Path
 import re
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
@@ -15,13 +19,52 @@ RECOMMENDED_HEADINGS = (
     "## Common Pitfalls",
     "## Verification Checklist",
 )
-# Case-insensitive variants accepted in place of any recommended heading.
 HEADING_VARIANTS = {
     "## Overview": ("## overview",),
     "## When to Use": ("## when to use",),
     "## Common Pitfalls": ("## common pitfalls", "## pitfalls"),
     "## Verification Checklist": ("## verification checklist", "## verification"),
 }
+SUPPORT_DIRS = frozenset({"references", "scripts", "templates", "assets", "examples"})
+PATHLESS_BULLET_RE = re.compile(r"^\s*-\s+—\s+")
+SUPPORT_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_./-])((?:references|scripts|templates|assets|examples)/[A-Za-z0-9_./-]+)"
+)
+DANGLING_SCRUB_RE = re.compile(r"(?i)\bsee\s*;")
+
+
+def _manifest_paths(body: str) -> set[str]:
+    """Extract literal package-relative support paths from manifest sections only."""
+    paths: set[str] = set()
+    in_manifest = False
+    for line in body.splitlines():
+        heading = re.match(r"^\s*#{2,3}\s+(.+?)\s*$", line)
+        if heading:
+            title = heading.group(1).lower()
+            in_manifest = title in {
+                "support files",
+                "public support files",
+                "references",
+                "reference files",
+            }
+            continue
+        if not in_manifest:
+            continue
+        for match in SUPPORT_PATH_RE.finditer(line):
+            rel = match.group(1).rstrip(".,;:)")
+            if "*" not in rel and not rel.endswith("/") and "<" not in rel:
+                paths.add(rel)
+    return paths
+
+
+def _physical_support_paths(package: Path) -> set[str]:
+    return {
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*")
+        if path.is_file()
+        and path.name != "SKILL.md"
+        and any(part in SUPPORT_DIRS for part in path.relative_to(package).parts)
+    }
 
 
 def validate_skill(path: Path) -> tuple[list[str], list[str]]:
@@ -29,10 +72,10 @@ def validate_skill(path: Path) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
     content = path.read_text(encoding="utf-8")
     if not content.startswith("---\n"):
-        return [f"must start with YAML frontmatter at byte zero"], []
+        return ["must start with YAML frontmatter at byte zero"], []
     marker = content.find("\n---\n", 4)
     if marker < 0:
-        return [f"frontmatter is not closed"], []
+        return ["frontmatter is not closed"], []
     frontmatter = content[4:marker]
     body = content[marker + 5 :]
     name_match = re.search(r"(?m)^name:\s*([^\n]+)$", frontmatter)
@@ -51,6 +94,18 @@ def validate_skill(path: Path) -> tuple[list[str], list[str]]:
         errors.append("skill body is empty")
     if len(content) > 100_000:
         errors.append("SKILL.md exceeds 100,000 characters")
+    if any(PATHLESS_BULLET_RE.match(line) for line in body.splitlines()):
+        errors.append("pathless support bullet found; use an explicit relative path or remove the pointer")
+    if DANGLING_SCRUB_RE.search(body):
+        errors.append("dangling scrub remnant found: 'see ;'")
+
+    manifest = _manifest_paths(body)
+    physical = _physical_support_paths(path.parent)
+    for rel in sorted(manifest - physical):
+        errors.append(f"missing explicitly referenced support file: {rel}")
+    for rel in sorted(physical - manifest):
+        errors.append(f"physically shipped support file is not explicitly referenced: {rel}")
+
     lower = body.lower()
     for heading in RECOMMENDED_HEADINGS:
         variants = (heading,) + HEADING_VARIANTS[heading]
@@ -60,7 +115,7 @@ def validate_skill(path: Path) -> tuple[list[str], list[str]]:
 
 
 def main() -> int:
-    paths = sorted(SKILLS.glob("*/SKILL.md"))
+    paths = sorted(SKILLS.rglob("SKILL.md"))
     if not paths:
         print("ERROR: no skill packages found")
         return 1
@@ -76,6 +131,7 @@ def main() -> int:
         else:
             print(f"SKILL_VALIDATION=PASS path={path.relative_to(ROOT)} chars={len(path.read_text(encoding='utf-8'))}")
     if failures:
+        print(f"COLLECTION_VALIDATION=FAIL skills={len(paths)} failures={failures}")
         return 1
     print(f"COLLECTION_VALIDATION=PASS skills={len(paths)}")
     return 0

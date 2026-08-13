@@ -268,3 +268,9 @@ A stale harness may still be useful as a map, but it must not be treated as veri
 - Hermes profiles: https://hermes-agent.nousresearch.com/docs/user-guide/profiles
 - Hermes cron: https://hermes-agent.nousresearch.com/docs/user-guide/features/cron
 - Original workshop: https://www.reddit.com/r/hermesagent/comments/1tmpq0n/workshop_teach_hermes_to_drive_any_website_zero/
+## Public support files
+
+- `references/harness-schema.md`
+- `scripts/validate_harness.py`
+- `templates/harness-template.md`
+- `templates/survey-log.md`

@@ -334,3 +334,7 @@ python3 scripts/test_collection.py
 - Notion API versioning: https://developers.notion.com/reference/versioning
 - Hermes skills documentation: https://hermes-agent.nousresearch.com/docs/user-guide/features/skills
 - Hermes environment variables: https://hermes-agent.nousresearch.com/docs/reference/environment-variables
+## Public support files
+
+- `scripts/bootstrap_library.py`
+- `scripts/save_artifact.py`

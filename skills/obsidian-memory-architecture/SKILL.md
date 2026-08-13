@@ -340,3 +340,13 @@ Older setups often treated large `MEMORY.md` and `USER.md` files as the primary 
 - Hermes cron documentation: https://hermes-agent.nousresearch.com/docs/user-guide/features/cron
 - Bundled Obsidian skill: https://hermes-agent.nousresearch.com/docs/user-guide/skills/bundled/note-taking/note-taking-obsidian
 - Original field guide: https://www.reddit.com/r/hermesagent/comments/1stz6gd/how_i_use_obsidian_as_the_longterm_memory/
+## Public support files
+
+- `scripts/scaffold_vault.py`
+- `scripts/validate_skill.py`
+- `templates/Assistant-Knowledge-Map.md`
+- `templates/Daily.md`
+- `templates/Decision.md`
+- `templates/Project.md`
+- `tests/test_scaffold.py`
+- `tests/test_validate_skill.py`
