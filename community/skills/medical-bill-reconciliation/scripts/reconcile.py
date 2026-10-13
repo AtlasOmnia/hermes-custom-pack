@@ -128,6 +128,7 @@ class Line:
     money: dict[str, Decimal] = field(default_factory=dict)
     service_date: date | None = None
     statement_date: date | None = None
+    eob_date: date | None = None
     provider_key: str = ""
     patient_key: str = ""
 
@@ -173,6 +174,11 @@ def read_lines(path: Path, kind: str, aliases: dict[str, str]) -> tuple[list[Lin
                     line.statement_date = parse_date(row.get("statement_date", ""))
                 except ValueError as exc:
                     errors.append(f"{path} row {index}: statement_date: {exc}")
+            if kind == "eob" and row.get("eob_date"):
+                try:
+                    line.eob_date = parse_date(row["eob_date"])
+                except ValueError as exc:
+                    errors.append(f"{path} row {index}: eob_date: {exc}")
             line.provider_key = norm_provider(row.get("provider", ""), aliases)
             line.patient_key = norm_text(row.get("patient", ""))
             lines.append(line)
@@ -282,35 +288,68 @@ def cmd_run(args: argparse.Namespace) -> int:
             flag("EOB_MATH", line, issue)
 
     # ---- EOB de-duplication. Excluded lines never reach matching or accumulators.
+    # A claim line's identity ignores the money split, so a corrected EOB that changes
+    # allowed/paid/responsibility is recognised as the same line, not a second one.
+    order = {id(line): i for i, line in enumerate(eob)}
+    identities: dict[tuple, list[Line]] = defaultdict(list)
+    for line in eob:
+        identity = ((norm_text(line.raw.get("claim_id", "")),) + match_key(line)
+                    + (cpt_base(line.raw.get("cpt", "")), line.money["billed"]))
+        identities[identity].append(line)
+    excluded: set[int] = set()
+    excluded_as: dict[str, str] = {}
+    for copies in identities.values():
+        files = list(dict.fromkeys(c.raw.get("source_file", "") for c in copies))
+        if len(files) > 1:
+            # Keep the document with the latest eob_date; ties go to the one loaded last.
+            def rank(name: str, copies: list[Line] = copies) -> tuple:
+                mine = [c for c in copies if c.raw.get("source_file", "") == name]
+                dates = [c.eob_date for c in mine if c.eob_date]
+                return (max(dates) if dates else date.min, max(order[id(c)] for c in mine))
+            keep = max(files, key=rank)
+            kept = next(c for c in copies if c.raw.get("source_file", "") == keep)
+            for line in copies:
+                if line.raw.get("source_file", "") == keep:
+                    continue
+                excluded.add(id(line))
+                if all(line.money.get(k) == kept.money.get(k) for k in EOB_MONEY):
+                    flag("DUPLICATE_EOB_LINE", line,
+                         f"same claim line also loaded from {kept.ref()}; that copy is kept and this one "
+                         "is excluded from matching and totals", line.money["patient_resp"])
+                else:
+                    flag("REVISED_EOB_LINE", line,
+                         f"a revised version of this claim line is in {kept.ref()} (patient_resp "
+                         f"{kept.money['patient_resp']} there vs {line.money['patient_resp']} here); the "
+                         "later EOB is kept and this one is excluded from matching and totals",
+                         line.money["patient_resp"])
+            copies = [c for c in copies if c.raw.get("source_file", "") == keep]
+        for repeat in copies[1:]:
+            # Same document: could be two genuine units of the same service. Keep it, ask a human.
+            flag("REPEATED_EOB_LINE", repeat,
+                 f"identical line also at {copies[0].ref()} in the same document; confirm two units, "
+                 "otherwise remove the extra row", repeat.money["patient_resp"])
+
     active_eob: list[Line] = []
-    seen_line: dict[tuple, Line] = {}
     seen_service: dict[tuple, Line] = {}
     for line in eob:
-        service = match_key(line) + (cpt_base(line.raw.get("cpt", "")), line.money["billed"])
-        same_claim = (norm_text(line.raw.get("claim_id", "")),) + service + (line.money["patient_resp"],)
-        prior = seen_line.get(same_claim)
-        if prior is not None:
-            if prior.raw.get("source_file") != line.raw.get("source_file"):
-                # Same claim line loaded from a second document: a reissued/corrected EOB or a re-download.
-                flag("DUPLICATE_EOB_LINE", line,
-                     f"same claim line already loaded from {prior.ref()}; excluded from totals. "
-                     "Load a corrected EOB instead of, not in addition to, the original",
-                     line.money["patient_resp"])
-                continue
-            # Same document: could be two genuine units of the same service. Keep it, ask a human.
-            flag("REPEATED_EOB_LINE", line,
-                 f"identical line also at {prior.ref()} in the same document; confirm two units, "
-                 "otherwise remove the extra row", line.money["patient_resp"])
-        else:
-            seen_line[same_claim] = line
-        prior_service = seen_service.get(service)
-        if (prior_service is not None
-                and norm_text(prior_service.raw.get("claim_id", "")) != norm_text(line.raw.get("claim_id", ""))):
-            flag("DUPLICATE_CLAIM", line,
-                 f"same service already processed on claim {prior_service.raw.get('claim_id') or '?'} "
-                 f"({prior_service.ref()}); this claim is excluded from matching and totals",
-                 line.money["patient_resp"])
+        if id(line) in excluded:
             continue
+        code = cpt_base(line.raw.get("cpt", ""))
+        service = match_key(line) + (code, line.money["billed"])
+        claim = norm_text(line.raw.get("claim_id", ""))
+        prior = seen_service.get(service)
+        if prior is not None and norm_text(prior.raw.get("claim_id", "")) != claim:
+            other = prior.raw.get("claim_id") or "?"
+            if code:
+                flag("DUPLICATE_CLAIM", line,
+                     f"same service already processed on claim {other} ({prior.ref()}); "
+                     "this claim is excluded from matching and totals", line.money["patient_resp"])
+                excluded_as[claim] = f"it was loaded and excluded as DUPLICATE_CLAIM of {other} ({line.ref()})"
+                continue
+            # Without a procedure code, two genuine same-day, same-price services look identical.
+            flag("POSSIBLE_DUPLICATE_CLAIM", line,
+                 f"same date, provider, and billed amount as claim {other} ({prior.ref()}) and no CPT "
+                 "code to tell them apart; both are kept", line.money["patient_resp"])
         seen_service.setdefault(service, line)
         active_eob.append(line)
 
@@ -360,9 +399,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         method = "claim_id"
         if claim:
             candidates = [c for c in by_claim.get(claim, []) if cpt_compatible(bill, c)]
+            # A claim can span several dates (therapy, inpatient); prefer lines from this date.
+            candidates = [c for c in candidates if c.service_date == bill.service_date] or candidates
             if not by_claim.get(claim):
+                why = excluded_as.get(claim) or "no loaded EOB has it"
                 flag("CLAIM_ID_NOT_ON_EOB", bill,
-                     f"statement cites claim {bill.raw['claim_id']} but no loaded EOB has it",
+                     f"statement cites claim {bill.raw['claim_id']} but {why}",
                      bill.money["amount_due"])
         if not candidates:
             method = "date_provider_patient"
@@ -370,6 +412,11 @@ def cmd_run(args: argparse.Namespace) -> int:
             if bill.money["billed"] and len(candidates) > 1:
                 exact = [c for c in candidates if abs(c.money["billed"] - bill.money["billed"]) <= tolerance]
                 candidates = exact or candidates
+        if candidates and claim and by_claim.get(claim) and method != "claim_id":
+            flag("CLAIM_ID_MISMATCH", bill,
+                 f"statement cites claim {bill.raw['claim_id']} but this line matched claim "
+                 f"{';'.join(sorted({c.raw.get('claim_id') or '?' for c in candidates}))} by date and provider",
+                 bill.money["amount_due"])
         if not candidates:
             age = (as_of - bill.statement_date).days if bill.statement_date else 0
             if age >= args.no_eob_days:
@@ -416,6 +463,12 @@ def cmd_run(args: argparse.Namespace) -> int:
             flag("BILL_BELOW_EOB", first,
                  f"statement asks {due}, EOB says {owed}; may reflect a payment already made",
                  -diff, source=bill_refs)
+        elif len(members) > 1 and any(b.money["amount_due"] <= ZERO for b in members):
+            # Totals agree, but a zero/credit line can hide an overcharge on another line.
+            status = "REVIEW_PARTIAL"
+            flag("PARTIAL_PAYMENT_IN_GROUP", first,
+                 "totals agree, but a zero or credit line in this group could be offsetting an "
+                 "overcharge on another line; check line by line", None, source=bill_refs)
         else:
             status = "OK"
         billed = sum((b.money["billed"] for b in members), ZERO)

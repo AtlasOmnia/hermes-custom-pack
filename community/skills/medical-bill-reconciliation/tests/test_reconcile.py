@@ -402,5 +402,72 @@ class Validation(Base):
             reconcile.parse_money("twelve")
 
 
+class CriticRegressions(Base):
+    """Scenarios from the second independent review."""
+
+    def corrected(self, original_resp="40", corrected_resp="25", corrected_first=False):
+        original = ["C100", "2026-01-10", "Clinic", "Alex", "99213", "250", "120", "80", original_resp,
+                    original_resp, "0", "0", "2026-02-01", "eob.pdf", "1"]
+        fixed = ["C100", "2026-01-10", "Clinic", "Alex", "99213", "250", "120",
+                 str(120 - int(corrected_resp)), corrected_resp, corrected_resp, "0", "0",
+                 "2026-02-20", "eob-corrected.pdf", "1"]
+        return [fixed, original] if corrected_first else [original, fixed]
+
+    def test_corrected_eob_replaces_original_and_overbill_is_caught(self) -> None:
+        for corrected_first in (False, True):
+            summary, matches, _ = self.reconcile(
+                self.corrected(corrected_first=corrected_first),
+                [bill_row("A", "2026-03-01", "2026-01-10", "Clinic", "99213", "250", "40", claim="C100")])
+            self.assertEqual(summary["exceptions"], {"OVERBILLED": 1, "REVISED_EOB_LINE": 1})
+            self.assertEqual(matches[0]["status"], "OVERBILLED")
+            self.assertEqual(matches[0]["difference"], "15.00")
+            acc = summary["accumulators"]["Alex"]
+            self.assertEqual((acc["billed"], acc["patient_resp"], acc["deductible_applied"]),
+                             ("250.00", "25.00", "25.00"))
+
+    def test_partial_payment_inside_group_is_not_ok(self) -> None:
+        eob = [eob_row("C300", "2026-03-01", "Clinic", "", "100", "80", "60", "20"),
+               eob_row("C300", "2026-03-01", "Clinic", "", "50", "40", "30", "10")]
+        bills = [bill_row("A", "2026-03-25", "2026-03-01", "Clinic", "99213", "100", "30", claim="C300"),
+                 bill_row("A", "2026-03-25", "2026-03-01", "Clinic", "36415", "50", "0", claim="C300")]
+        summary, matches, _ = self.reconcile(eob, bills)
+        self.assertEqual(matches[0]["status"], "REVIEW_PARTIAL")
+        self.assertEqual(summary["exceptions"], {"PARTIAL_PAYMENT_IN_GROUP": 1})
+
+    def test_multi_date_claim_matches_the_bill_date(self) -> None:
+        eob = [eob_row("C1", "2026-03-01", "Rehab", "97110", "100", "80", "60", "20"),
+               eob_row("C1", "2026-03-03", "Rehab", "97110", "100", "80", "50", "30")]
+        summary, matches, _ = self.reconcile(
+            eob, [bill_row("A", "2026-03-25", "2026-03-01", "Rehab", "97110", "100", "20", claim="C1")])
+        self.assertEqual(summary["exceptions"], {})
+        self.assertEqual(matches[0]["status"], "OK")
+
+    def test_same_day_claims_without_cpt_are_kept(self) -> None:
+        eob = [eob_row("L1", "2026-03-01", "Lab", "", "50", "30", "20", "10"),
+               eob_row("L2", "2026-03-01", "Lab", "", "50", "30", "20", "10", src="eob2.pdf")]
+        summary, matches, _ = self.reconcile(
+            eob, [bill_row("A", "2026-03-25", "2026-03-01", "Lab", "", "100", "20")])
+        self.assertEqual(summary["exceptions"], {"POSSIBLE_DUPLICATE_CLAIM": 1})
+        self.assertEqual(matches[0]["status"], "OK")
+        self.assertEqual(summary["accumulators"]["Alex"]["patient_resp"], "20.00")
+
+    def test_cited_claim_resolving_elsewhere_is_flagged(self) -> None:
+        eob = [eob_row("C1", "2026-03-01", "Clinic", "99213", "100", "80", "60", "20"),
+               eob_row("C2", "2026-03-01", "Clinic", "36415", "50", "40", "30", "10")]
+        summary, matches, rows = self.reconcile(
+            eob, [bill_row("A", "2026-03-25", "2026-03-01", "Clinic", "36415", "50", "10", claim="C1")])
+        self.assertEqual(summary["exceptions"], {"CLAIM_ID_MISMATCH": 1})
+        self.assertEqual(matches[0]["claim_ids"], "C2")
+        self.assertIn("C2", rows[0]["detail"])
+
+    def test_claim_excluded_as_duplicate_is_explained(self) -> None:
+        eob = [eob_row("C200", "2026-02-05", "Imaging", "73721", "1200", "600", "300", "300", src="a.pdf"),
+               eob_row("C201", "2026-02-05", "Imaging", "73721", "1200", "600", "300", "300", src="b.pdf")]
+        _, _, rows = self.reconcile(
+            eob, [bill_row("A", "2026-03-10", "2026-02-05", "Imaging", "73721", "1200", "300", claim="C201")])
+        detail = next(r["detail"] for r in rows if r["code"] == "CLAIM_ID_NOT_ON_EOB")
+        self.assertIn("excluded as DUPLICATE_CLAIM of C200", detail)
+
+
 if __name__ == "__main__":
     unittest.main()

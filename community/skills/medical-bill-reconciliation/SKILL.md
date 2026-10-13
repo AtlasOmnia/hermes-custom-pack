@@ -1,7 +1,7 @@
 ---
 name: medical-bill-reconciliation
 description: Use when reconciling medical bills against insurer EOBs.
-version: 1.1.0
+version: 1.2.0
 author: AtlasOmnia
 license: MIT
 platforms:
@@ -33,7 +33,7 @@ The work is split into stages that never share access:
 2. **Extract.** `scripts/eob_extract.py` dumps PDF text and tables; the agent maps them into fixed CSV rows, each keeping its source file and page.
 3. **Validate.** `scripts/reconcile.py validate` checks columns, dates, money, and EOB arithmetic.
 4. **Reconcile.** `scripts/reconcile.py run` matches bills to EOB lines and writes `matches.csv`, `exceptions.csv`, `summary.json`.
-5. **Review.** The agent summarizes exceptions by dollar amount and drafts inquiries. A human decides and sends.
+5. **Review.** The agent summarizes exceptions by dollar amount and drafts inquiries. A human decides and sends. Output columns and status values are listed in `references/exception-codes.md`.
 
 The scripts are offline and give the same output for the same inputs and `--as-of` date. The reconciler is stdlib-only; the extractor needs `pdfplumber`.
 
@@ -86,7 +86,7 @@ Read each `extracted/<file>.json` and write rows that follow the template header
 - EOB columns: `claim_id, service_date, provider, patient, cpt, billed, allowed, plan_paid, patient_resp, deductible_applied, coinsurance, copay, eob_date`. `patient_resp` is the total the member owes for that line.
 - Bill columns: `bill_id` (provider account or statement number), `statement_date`, `service_date`, `provider`, `patient`, `cpt`, `billed`, `amount_due`, `claim_id` if printed.
 - Use the same `bill_id` for every statement from one provider account. The reconciler keeps only the latest statement per account and lists older ones as `OLDER_STATEMENT`.
-- When an insurer issues a corrected EOB, replace the original rows. Loading both gives `DUPLICATE_EOB_LINE` and the second copy is excluded.
+- Fill `eob_date` on every EOB row. When an insurer issues a corrected EOB, replace the original rows; if both are loaded, the one with the later `eob_date` wins and the other is listed as `REVISED_EOB_LINE` or `DUPLICATE_EOB_LINE`.
 - Pages with `needs_ocr: true` are scans. Run `ocrmypdf` on the file, extract again, and only then map.
 - When validation fails, reread the source page. Never adjust a number just to make a check pass.
 
