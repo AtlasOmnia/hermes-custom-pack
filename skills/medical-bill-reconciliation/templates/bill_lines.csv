@@ -1,0 +1,1 @@
+bill_id,statement_date,service_date,provider,patient,cpt,billed,amount_due,claim_id,source_file,source_page
