@@ -134,7 +134,7 @@ def validate_workflow(path: Path) -> list[str]:
         errors.append("must start with a '# ' title")
     if not SOURCE_THREAD_RE.search(content):
         errors.append("missing '**Source thread:** https://www.reddit.com/r/...' line")
-    outside_code = re.sub(r"(?ms)^```.*?^```", "", content)
+    outside_code = re.sub(r"(?ms)^[ \t]*(```|~~~).*?(?:^[ \t]*\1|\Z)", "", content)
     for heading in WORKFLOW_REQUIRED_HEADINGS:
         if not re.search(rf"(?mi)^{re.escape(heading)}\s*$", outside_code):
             errors.append(f"missing required heading: {heading}")

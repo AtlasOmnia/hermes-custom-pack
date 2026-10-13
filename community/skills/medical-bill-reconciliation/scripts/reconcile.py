@@ -308,6 +308,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 return (max(dates) if dates else date.min, max(order[id(c)] for c in mine))
             keep = max(files, key=rank)
             kept = next(c for c in copies if c.raw.get("source_file", "") == keep)
+            kept_date = rank(keep)[0]
             for line in copies:
                 if line.raw.get("source_file", "") == keep:
                     continue
@@ -317,10 +318,19 @@ def cmd_run(args: argparse.Namespace) -> int:
                          f"same claim line also loaded from {kept.ref()}; that copy is kept and this one "
                          "is excluded from matching and totals", line.money["patient_resp"])
                 else:
+                    mine = line.eob_date
+                    if kept_date != date.min and mine and kept_date > mine:
+                        basis = f"kept by later eob_date ({kept_date.isoformat()} vs {mine.isoformat()})"
+                    elif kept_date != date.min and not mine:
+                        basis = (f"kept because only that copy has an eob_date ({kept_date.isoformat()}); "
+                                 "confirm it is the current one")
+                    else:
+                        basis = ("no eob_date tells them apart, so the copy loaded last was kept; "
+                                 "confirm which is current")
                     flag("REVISED_EOB_LINE", line,
-                         f"a revised version of this claim line is in {kept.ref()} (patient_resp "
-                         f"{kept.money['patient_resp']} there vs {line.money['patient_resp']} here); the "
-                         "later EOB is kept and this one is excluded from matching and totals",
+                         f"a different version of this claim line is in {kept.ref()} (patient_resp "
+                         f"{kept.money['patient_resp']} there vs {line.money['patient_resp']} here); "
+                         f"{basis}. This copy is excluded from matching and totals",
                          line.money["patient_resp"])
             copies = [c for c in copies if c.raw.get("source_file", "") == keep]
         for repeat in copies[1:]:
@@ -352,6 +362,20 @@ def cmd_run(args: argparse.Namespace) -> int:
                  "code to tell them apart; both are kept", line.money["patient_resp"])
         seen_service.setdefault(service, line)
         active_eob.append(line)
+
+    # A correction that changes billed or CPT isn't recognised as a revision above. Make sure a
+    # claim spread across several documents is at least visible.
+    claim_files: dict[str, list[Line]] = defaultdict(list)
+    for line in active_eob:
+        claim = norm_text(line.raw.get("claim_id", ""))
+        if claim:
+            claim_files[claim].append(line)
+    for lines in claim_files.values():
+        files = list(dict.fromkeys(l.raw.get("source_file", "") for l in lines))
+        if len(files) > 1:
+            flag("CLAIM_IN_MULTIPLE_DOCUMENTS", lines[0],
+                 f"claim {lines[0].raw.get('claim_id')} has active lines in {len(files)} documents "
+                 f"({', '.join(files)}); if one is a correction, replace the original rows", None)
 
     # ---- Statements: keep only the latest statement per account.
     latest: dict[str, date] = {}
@@ -399,8 +423,15 @@ def cmd_run(args: argparse.Namespace) -> int:
         method = "claim_id"
         if claim:
             candidates = [c for c in by_claim.get(claim, []) if cpt_compatible(bill, c)]
-            # A claim can span several dates (therapy, inpatient); prefer lines from this date.
-            candidates = [c for c in candidates if c.service_date == bill.service_date] or candidates
+            # A claim can span several dates (therapy, inpatient); prefer lines from this date,
+            # unless the bill line is a summary of the whole claim (only the full set agrees).
+            same_day = [c for c in candidates if c.service_date == bill.service_date]
+            if same_day and len(same_day) < len(candidates):
+                due = bill.money["amount_due"]
+                day_owed = sum((c.money["patient_resp"] for c in same_day), ZERO)
+                all_owed = sum((c.money["patient_resp"] for c in candidates), ZERO)
+                if not (abs(due - day_owed) > tolerance and abs(due - all_owed) <= tolerance):
+                    candidates = same_day
             if not by_claim.get(claim):
                 why = excluded_as.get(claim) or "no loaded EOB has it"
                 flag("CLAIM_ID_NOT_ON_EOB", bill,

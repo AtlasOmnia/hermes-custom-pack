@@ -1,7 +1,7 @@
 ---
 name: medical-bill-reconciliation
 description: Use when reconciling medical bills against insurer EOBs.
-version: 1.2.0
+version: 1.2.1
 author: AtlasOmnia
 license: MIT
 platforms:

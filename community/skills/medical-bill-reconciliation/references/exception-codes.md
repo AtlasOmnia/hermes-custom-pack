@@ -12,11 +12,12 @@
 | DUPLICATE_CLAIM | Same service (same CPT code) processed under two claim numbers. The second claim is excluded from matching and totals | Ask the insurer whether one should be voided |
 | POSSIBLE_DUPLICATE_CLAIM | Two claims share date, provider, and billed amount but have no CPT code to tell them apart. Both are kept | Check whether these are two real services or one processed twice |
 | DUPLICATE_EOB_LINE | The same claim line, with the same amounts, was loaded from two documents (usually a re-download). The copy from the EOB with the latest `eob_date` is kept | Delete the extra rows |
-| REVISED_EOB_LINE | The same claim line was loaded from two documents with different amounts (a corrected or reprocessed EOB). Only the latest `eob_date` is kept | Confirm the later EOB is the final one; replace the original's rows next time |
+| REVISED_EOB_LINE | The same claim line was loaded from two documents with different amounts (a corrected or reprocessed EOB). Only the latest `eob_date` is kept; if `eob_date` is blank, the detail says how the copy was chosen | Confirm the later EOB is the final one; replace the original's rows next time |
 | REPEATED_EOB_LINE | Two identical lines in one EOB document. Both are kept | Confirm two units were really billed; otherwise delete the extra row |
 | DUPLICATE_CHARGE | Identical line appears twice on one statement | Ask the provider to remove the duplicate |
 | OLDER_STATEMENT | An older statement for the same account; only the latest is reconciled | None; listed so you know it was ignored |
 | AMBIGUOUS_MATCH | Statement lines overlap the same EOB lines in different combinations, so the split can't be determined | Compare by hand. Adding CPT codes or the claim number to both sides usually resolves it; a billed-amount difference on one line can make the whole statement ambiguous |
+| CLAIM_IN_MULTIPLE_DOCUMENTS | One claim number has active lines in more than one EOB document, which usually means a correction changed the billed amount or CPT code | If one document is a correction, delete the original's rows and rerun |
 | PARTIAL_PAYMENT_IN_GROUP | A group's totals agree, but it contains a zero or credit line that could be offsetting an overcharge on another line | Compare line by line against the EOB |
 | EOB_MATH | allowed exceeds billed, or allowed != plan paid + patient responsibility | Usually an extraction error; reread the page. If printed that way, ask the insurer |
 | DEDUCTIBLE_EXCEEDED | Deductible applied across the year exceeds the plan deductible | Compare with the insurer's accumulator page; ask for reprocessing |
@@ -29,7 +30,7 @@
 
 CPT codes are compared on the 5-character base code, so modifiers and unit suffixes (`99213-25`, `99213 x2`) still match.
 
-When a claim covers several dates (therapy, inpatient stays), a bill line is compared only with that claim's lines on the same date of service.
+When a claim covers several dates (therapy, inpatient stays), a bill line is compared only with that claim's lines on the same date of service, unless only the whole claim's total matches it (a one-line statement summarizing the course). For anything else, map a date-range statement line to one row per date.
 
 Statement lines on the same account that resolve to the same set of EOB lines are compared **together**. A statement with one row per procedure therefore reconciles correctly against a claim whose EOB rows have no CPT codes, and the other way around. If those groups overlap, the result is `AMBIGUOUS_MATCH`, never a guess. Inside a group only totals are compared, so keep CPT codes on both sides whenever the documents print them.
 

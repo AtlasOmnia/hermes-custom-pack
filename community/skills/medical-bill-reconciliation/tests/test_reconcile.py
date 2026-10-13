@@ -468,6 +468,36 @@ class CriticRegressions(Base):
         detail = next(r["detail"] for r in rows if r["code"] == "CLAIM_ID_NOT_ON_EOB")
         self.assertIn("excluded as DUPLICATE_CLAIM of C200", detail)
 
+    def test_undated_revision_says_why_it_kept_a_copy(self) -> None:
+        rows = self.corrected()
+        rows[0][12] = ""  # original undated
+        _, _, exc = self.reconcile(
+            rows, [bill_row("A", "2026-03-01", "2026-01-10", "Clinic", "99213", "250", "25", claim="C100")])
+        detail = next(r["detail"] for r in exc if r["code"] == "REVISED_EOB_LINE")
+        self.assertIn("only that copy has an eob_date", detail)
+        rows[1][12] = ""  # both undated
+        _, _, exc = self.reconcile(
+            rows, [bill_row("A", "2026-03-01", "2026-01-10", "Clinic", "99213", "250", "25", claim="C100")])
+        detail = next(r["detail"] for r in exc if r["code"] == "REVISED_EOB_LINE")
+        self.assertIn("confirm which is current", detail)
+        self.assertNotIn("later", detail)
+
+    def test_correction_changing_billed_is_visible(self) -> None:
+        rows = self.corrected()
+        rows[1][5] = "275"
+        summary, _, _ = self.reconcile(
+            rows, [bill_row("A", "2026-03-01", "2026-01-10", "Clinic", "99213", "275", "25", claim="C100")])
+        self.assertIn("CLAIM_IN_MULTIPLE_DOCUMENTS", summary["exceptions"])
+
+    def test_summary_line_for_multi_date_claim_uses_whole_claim(self) -> None:
+        eob = [eob_row("C1", "2026-03-01", "Rehab", "97110", "100", "80", "60", "20"),
+               eob_row("C1", "2026-03-03", "Rehab", "97110", "100", "80", "50", "30")]
+        summary, matches, _ = self.reconcile(
+            eob, [bill_row("A", "2026-03-25", "2026-03-01", "Rehab", "", "200", "50", claim="C1")])
+        self.assertEqual(matches[0]["status"], "OK")
+        self.assertEqual(matches[0]["eob_lines"], "2")
+        self.assertEqual(summary["exceptions"], {})
+
 
 if __name__ == "__main__":
     unittest.main()
