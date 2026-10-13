@@ -2,7 +2,7 @@
 
 **Source thread:** https://www.reddit.com/r/hermesagent/comments/1wyimkz/operator_lab_whats_one_real_task_you_want_hermes/
 **Works with:** Godot 4.x, Hermes with a local model through Ollama or llama.cpp
-**Status:** Ready
+**Status:** Draft, untested. The Godot check commands below have not been run against a real Godot 4 project yet and may be wrong. In particular, checking a single script outside the project can report false "not declared" errors for autoloads and classes defined in other files. Don't rely on this loop until this note is removed.
 
 ## Request
 
