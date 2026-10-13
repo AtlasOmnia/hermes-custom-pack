@@ -81,6 +81,8 @@ For items worth pursuing, the agent fills `templates/provider-inquiry.md` into `
 
 Once a month of real documents has gone through cleanly by hand, schedule it. Example prompt for a monthly cron job:
 
-> Run the medical-bill-reconciliation workflow for ~/medical-billing: extract new PDFs in inbox/, append rows with source_file and source_page, run validate and fix only by rereading source pages, run reconcile for the current plan year, and send me the exception summary sorted by amount with draft inquiries for anything over $25. Do not contact any provider or insurer.
+> Run the medical-bill-reconciliation workflow for ~/medical-billing: extract new PDFs in inbox/, append rows with source_file and source_page, run validate and fix only by rereading source pages, run reconcile for the current plan year, pass --as-of with today's date, and write the exception summary sorted by amount, with draft inquiries for anything over $25, to runs/<date>/report.md. Do not contact any provider or insurer.
+
+Delivering the report to a messaging gateway (Telegram, Discord, email) sends patient names, providers, claim numbers, and amounts off the machine. If that matters, deliver only a count ("3 exceptions, $412 flagged — see report.md") and read the details locally.
 
 Collectors can run on their own schedule a day earlier. If a collector hits a human-only MFA step, the run proceeds with whatever is already in the inbox and the summary says which portal was skipped.

@@ -1,7 +1,7 @@
 ---
 name: medical-bill-reconciliation
 description: Use when reconciling medical bills against insurer EOBs.
-version: 1.0.0
+version: 1.1.0
 author: AtlasOmnia
 license: MIT
 platforms:
@@ -19,7 +19,6 @@ metadata:
       - reconciliation
       - personal-finance
     related_skills:
-      - ocr-and-documents
       - pdf
 ---
 # Medical Bill Reconciliation
@@ -36,7 +35,9 @@ The work is split into stages that never share access:
 4. **Reconcile.** `scripts/reconcile.py run` matches bills to EOB lines and writes `matches.csv`, `exceptions.csv`, `summary.json`.
 5. **Review.** The agent summarizes exceptions by dollar amount and drafts inquiries. A human decides and sends.
 
-The scripts are offline and deterministic. The reconciler is stdlib-only; the extractor needs `pdfplumber`. Pair it with a local model if documents must not leave the machine.
+The scripts are offline and give the same output for the same inputs and `--as-of` date. The reconciler is stdlib-only; the extractor needs `pdfplumber`.
+
+**Where data leaves the machine:** the scripts never send anything, but the Mapping step puts PDF text in front of the model, and any report delivered through a messaging gateway carries patient labels, providers, claim numbers, and amounts. For local-only processing, use a local model and deliver reports to a local file or the terminal.
 
 ## When to Use
 
@@ -59,10 +60,21 @@ python3 $SKILL/scripts/eob_extract.py inbox/eob/*.pdf inbox/bills/*.pdf --out ex
 # agent maps extracted/*.json into data/eob_lines.csv and data/bill_lines.csv
 python3 $SKILL/scripts/reconcile.py validate --eob data/eob_lines.csv --bills data/bill_lines.csv --aliases data/providers.csv
 python3 $SKILL/scripts/reconcile.py run --eob data/eob_lines.csv --bills data/bill_lines.csv \
-  --aliases data/providers.csv --deductible 3000 --oop-max 8000 --out runs/$(date +%F)
+  --aliases data/providers.csv --deductible 3000 --oop-max 8000 \
+  --as-of 2026-04-01 --out runs/2026-04-01
 ```
 
-Replace the deductible and out-of-pocket numbers with the plan's actual limits.
+Windows PowerShell differs only in setup and paths:
+
+```powershell
+$SKILL = "$HOME\.hermes\skills\productivity\medical-bill-reconciliation"
+"inbox\eob","inbox\bills","processed","extracted","data","runs" | ForEach-Object { New-Item -ItemType Directory -Force -Path "$HOME\medical-billing\$_" | Out-Null }
+Copy-Item "$SKILL\templates\*.csv" "$HOME\medical-billing\data\"
+Set-Location "$HOME\medical-billing"
+python "$SKILL\scripts\eob_extract.py" (Get-ChildItem inbox\eob\*.pdf, inbox\bills\*.pdf) --out extracted
+```
+
+Replace the deductible and out-of-pocket numbers with the plan's actual limits, and set `--as-of` to the run date so results are repeatable.
 
 ## Mapping Rules (the agent's part)
 
@@ -73,7 +85,8 @@ Read each `extracted/<file>.json` and write rows that follow the template header
 - Dates as `YYYY-MM-DD`. Use one consistent label per patient.
 - EOB columns: `claim_id, service_date, provider, patient, cpt, billed, allowed, plan_paid, patient_resp, deductible_applied, coinsurance, copay, eob_date`. `patient_resp` is the total the member owes for that line.
 - Bill columns: `bill_id` (provider account or statement number), `statement_date`, `service_date`, `provider`, `patient`, `cpt`, `billed`, `amount_due`, `claim_id` if printed.
-- Load only the latest statement per provider account; older statements repeat the same charges.
+- Use the same `bill_id` for every statement from one provider account. The reconciler keeps only the latest statement per account and lists older ones as `OLDER_STATEMENT`.
+- When an insurer issues a corrected EOB, replace the original rows. Loading both gives `DUPLICATE_EOB_LINE` and the second copy is excluded.
 - Pages with `needs_ocr: true` are scans. Run `ocrmypdf` on the file, extract again, and only then map.
 - When validation fails, reread the source page. Never adjust a number just to make a check pass.
 
@@ -88,7 +101,7 @@ Read each `extracted/<file>.json` and write rows that follow the template header
 1. **One agent with every login.** Keep collectors isolated per portal and keep the reconciler away from portals. A broken login should never touch the data.
 2. **Matching on amount alone.** Different visits often share a price. Match on claim number, or patient + date + provider, and use amount only to break ties.
 3. **Provider name drift.** "Bayside Ortho" and "Bayside Orthopedic Specialists PA" are the same practice. Add an `alias,canonical` row to `providers.csv` instead of editing source rows.
-4. **Counting repeated statements.** Monthly statements re-list old charges. Loading them all creates false duplicates.
+4. **Counting repeated statements.** Monthly statements re-list old charges. Keep `bill_id` consistent per account so older statements are recognized and skipped.
 5. **Treating extraction errors as billing errors.** Most `EOB_MATH` hits are misread columns. Confirm against the page before drafting anything.
 6. **Mixing plan years.** Accumulators reset each plan year. Run one year at a time.
 7. **Trusting summed accumulators over the insurer.** Totals cover only the EOBs you loaded. Compare with the insurer's accumulator page before claiming an overpayment.

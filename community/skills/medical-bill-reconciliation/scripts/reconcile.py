@@ -7,7 +7,7 @@ Stdlib only. Two subcommands:
       Check column names, dates, money values, and EOB arithmetic. Exit 1 on errors.
 
   run       --eob eob_lines.csv --bills bill_lines.csv --out DIR
-            [--as-of YYYY-MM-DD] [--no-eob-days 45] [--tolerance 1.00]
+            [--as-of YYYY-MM-DD] [--no-eob-days 45] [--tolerance 1.00]  # pass --as-of for repeatable output
             [--aliases providers.csv] [--deductible N] [--oop-max N]
       Write matches.csv, exceptions.csv, and summary.json into DIR.
 
@@ -80,16 +80,26 @@ def parse_date(value: str) -> date:
 
 
 def norm_text(value: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", (value or "").lower())).strip()
+    text = (value or "").lower()
+    # Collapse dotted initials so "P.A.", "M.D.", "L.L.C." become "pa", "md", "llc".
+    text = re.sub(r"(?<=\b[a-z])\.", "", text)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", text)).strip()
+
+
+def provider_core(value: str) -> str:
+    base = norm_text(value)
+    words = [w for w in base.split() if w not in PROVIDER_NOISE]
+    return " ".join(words) or base
 
 
 def norm_provider(value: str, aliases: dict[str, str]) -> str:
-    base = norm_text(value)
-    if base in aliases:
-        return aliases[base]
-    words = [w for w in base.split() if w not in PROVIDER_NOISE]
-    key = " ".join(words) or base
-    return aliases.get(key, key)
+    core = provider_core(value)
+    return aliases.get(core, core)
+
+
+def cpt_base(value: str) -> str:
+    """Base procedure code: modifiers and unit suffixes ("99213-25", "99213 x2") are ignored."""
+    return re.sub(r"[^A-Za-z0-9]", "", value or "")[:5].upper()
 
 
 def load_aliases(path: Path | None) -> dict[str, str]:
@@ -98,11 +108,14 @@ def load_aliases(path: Path | None) -> dict[str, str]:
     aliases: dict[str, str] = {}
     with path.open(newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
-        if not reader.fieldnames or not {"alias", "canonical"} <= set(reader.fieldnames):
+        if not reader.fieldnames or not {"alias", "canonical"} <= {f.strip() for f in reader.fieldnames}:
             raise InputError(f"{path}: alias file needs columns alias,canonical")
-        for row in reader:
-            canonical = norm_text(row["canonical"])
-            aliases[norm_text(row["alias"])] = canonical
+        for raw in reader:
+            row = {k.strip(): (v or "").strip() for k, v in raw.items() if k}
+            if not row.get("alias") or not row.get("canonical"):
+                raise InputError(f"{path} row {reader.line_num}: alias and canonical are both required")
+            canonical = provider_core(row["canonical"])
+            aliases[provider_core(row["alias"])] = canonical
             aliases[canonical] = canonical
     return aliases
 
@@ -212,14 +225,31 @@ def match_key(line: Line) -> tuple:
 
 
 def cpt_compatible(a: Line, b: Line) -> bool:
-    ca, cb = norm_text(a.raw.get("cpt", "")), norm_text(b.raw.get("cpt", ""))
+    ca, cb = cpt_base(a.raw.get("cpt", "")), cpt_base(b.raw.get("cpt", ""))
     return not ca or not cb or ca == cb
+
+
+def money_arg(text: str) -> Decimal:
+    try:
+        value = Decimal(str(text).replace("$", "").replace(",", ""))
+    except InvalidOperation:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}")
+    if not value.is_finite() or value < 0:
+        raise argparse.ArgumentTypeError(f"must be a non-negative number: {text!r}")
+    return value
+
+
+def date_arg(text: str) -> date:
+    try:
+        return parse_date(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc))
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     aliases = load_aliases(args.aliases)
-    tolerance = Decimal(str(args.tolerance))
-    as_of = parse_date(args.as_of) if args.as_of else date.today()
+    tolerance: Decimal = args.tolerance
+    as_of: date = args.as_of or date.today()
     eob, eob_errs = read_lines(args.eob, "eob", aliases)
     bills, bill_errs = read_lines(args.bills, "bill", aliases)
     hard = [e for e in eob_errs + bill_errs if not is_warning(e)]
@@ -231,7 +261,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     exceptions: list[dict[str, str]] = []
 
-    def flag(code: str, line: Line, detail: str, amount: Decimal | None = None) -> None:
+    def flag(code: str, line: Line, detail: str, amount: Decimal | None = None,
+             source: str | None = None) -> None:
         exceptions.append({
             "code": code,
             "kind": line.kind,
@@ -243,30 +274,68 @@ def cmd_run(args: argparse.Namespace) -> int:
             "bill_id": line.raw.get("bill_id", ""),
             "amount": f"{amount:.2f}" if amount is not None else "",
             "detail": detail,
-            "source": line.ref(),
+            "source": source or line.ref(),
         })
 
     for line in eob:
         for issue in eob_math_issues(line, tolerance):
             flag("EOB_MATH", line, issue)
 
-    # Same service processed under two different claim numbers.
-    seen: dict[tuple, Line] = {}
+    # ---- EOB de-duplication. Excluded lines never reach matching or accumulators.
+    active_eob: list[Line] = []
+    seen_line: dict[tuple, Line] = {}
+    seen_service: dict[tuple, Line] = {}
     for line in eob:
-        key = match_key(line) + (norm_text(line.raw.get("cpt", "")), line.money["billed"])
-        prior = seen.get(key)
-        if prior and prior.raw.get("claim_id") != line.raw.get("claim_id"):
-            flag("DUPLICATE_CLAIM", line,
-                 f"same service also on claim {prior.raw.get('claim_id') or '?'} ({prior.ref()})",
-                 line.money["patient_resp"])
+        service = match_key(line) + (cpt_base(line.raw.get("cpt", "")), line.money["billed"])
+        same_claim = (norm_text(line.raw.get("claim_id", "")),) + service + (line.money["patient_resp"],)
+        prior = seen_line.get(same_claim)
+        if prior is not None:
+            if prior.raw.get("source_file") != line.raw.get("source_file"):
+                # Same claim line loaded from a second document: a reissued/corrected EOB or a re-download.
+                flag("DUPLICATE_EOB_LINE", line,
+                     f"same claim line already loaded from {prior.ref()}; excluded from totals. "
+                     "Load a corrected EOB instead of, not in addition to, the original",
+                     line.money["patient_resp"])
+                continue
+            # Same document: could be two genuine units of the same service. Keep it, ask a human.
+            flag("REPEATED_EOB_LINE", line,
+                 f"identical line also at {prior.ref()} in the same document; confirm two units, "
+                 "otherwise remove the extra row", line.money["patient_resp"])
         else:
-            seen.setdefault(key, line)
+            seen_line[same_claim] = line
+        prior_service = seen_service.get(service)
+        if (prior_service is not None
+                and norm_text(prior_service.raw.get("claim_id", "")) != norm_text(line.raw.get("claim_id", ""))):
+            flag("DUPLICATE_CLAIM", line,
+                 f"same service already processed on claim {prior_service.raw.get('claim_id') or '?'} "
+                 f"({prior_service.ref()}); this claim is excluded from matching and totals",
+                 line.money["patient_resp"])
+            continue
+        seen_service.setdefault(service, line)
+        active_eob.append(line)
 
-    # Same charge listed twice on one statement.
-    seen_bill: dict[tuple, Line] = {}
+    # ---- Statements: keep only the latest statement per account.
+    latest: dict[str, date] = {}
     for line in bills:
-        key = (line.raw["bill_id"], line.statement_date) + match_key(line) + (
-            norm_text(line.raw.get("cpt", "")), line.money["billed"], line.money["amount_due"])
+        if line.statement_date and line.statement_date > latest.get(line.raw["bill_id"], date.min):
+            latest[line.raw["bill_id"]] = line.statement_date
+    active_bills: list[Line] = []
+    older_reported: set[tuple[str, date]] = set()
+    for line in bills:
+        if line.statement_date != latest.get(line.raw["bill_id"]):
+            key = (line.raw["bill_id"], line.statement_date)
+            if key not in older_reported:
+                older_reported.add(key)
+                flag("OLDER_STATEMENT", line,
+                     f"statement {line.raw['statement_date']} superseded by "
+                     f"{latest[line.raw['bill_id']].isoformat()} for account {line.raw['bill_id']}; ignored")
+            continue
+        active_bills.append(line)
+
+    seen_bill: dict[tuple, Line] = {}
+    for line in active_bills:
+        key = (line.raw["bill_id"],) + match_key(line) + (
+            cpt_base(line.raw.get("cpt", "")), line.money["billed"], line.money["amount_due"])
         if key in seen_bill:
             flag("DUPLICATE_CHARGE", line,
                  f"identical line already on this statement ({seen_bill[key].ref()})",
@@ -274,21 +343,27 @@ def cmd_run(args: argparse.Namespace) -> int:
         else:
             seen_bill[key] = line
 
+    # ---- Resolve candidates for each bill line.
     by_claim: dict[str, list[Line]] = defaultdict(list)
     by_key: dict[tuple, list[Line]] = defaultdict(list)
-    for line in eob:
+    for line in active_eob:
         if line.raw.get("claim_id"):
             by_claim[norm_text(line.raw["claim_id"])].append(line)
         by_key[match_key(line)].append(line)
 
-    matches: list[dict[str, str]] = []
-    for bill in bills:
+    groups: dict[tuple, list[Line]] = {}
+    group_candidates: dict[tuple, list[Line]] = {}
+    group_method: dict[tuple, str] = {}
+    for bill in active_bills:
         claim = norm_text(bill.raw.get("claim_id", ""))
-        candidates = by_claim.get(claim, []) if claim else []
+        candidates: list[Line] = []
         method = "claim_id"
-        if candidates and bill.raw.get("cpt"):
-            narrowed = [c for c in candidates if cpt_compatible(bill, c)]
-            candidates = narrowed or candidates
+        if claim:
+            candidates = [c for c in by_claim.get(claim, []) if cpt_compatible(bill, c)]
+            if not by_claim.get(claim):
+                flag("CLAIM_ID_NOT_ON_EOB", bill,
+                     f"statement cites claim {bill.raw['claim_id']} but no loaded EOB has it",
+                     bill.money["amount_due"])
         if not candidates:
             method = "date_provider_patient"
             candidates = [c for c in by_key.get(match_key(bill), []) if cpt_compatible(bill, c)]
@@ -305,57 +380,90 @@ def cmd_run(args: argparse.Namespace) -> int:
                      f"no EOB yet; statement is {age} days old (threshold {args.no_eob_days})",
                      bill.money["amount_due"])
             continue
+        # Bill lines that resolve to the same EOB lines are compared together, so a statement
+        # with one row per procedure reconciles against a claim whose EOB rows lack codes.
+        key = (bill.raw["bill_id"], tuple(sorted(id(c) for c in candidates)))
+        groups.setdefault(key, []).append(bill)
+        group_candidates[key] = candidates
+        group_method[key] = method
+
+    # EOB lines claimed by more than one group cannot be split safely.
+    usage: dict[int, int] = defaultdict(int)
+    for key in groups:
+        for eob_id in key[1]:
+            usage[eob_id] += 1
+
+    matches: list[dict[str, str]] = []
+    for key, members in groups.items():
+        candidates = group_candidates[key]
+        due = sum((b.money["amount_due"] for b in members), ZERO)
         owed = sum((c.money["patient_resp"] for c in candidates), ZERO)
-        due = bill.money["amount_due"]
         diff = due - owed
-        status = "OK"
-        if diff > tolerance:
+        first = members[0]
+        bill_refs = " | ".join(b.ref() for b in members)
+        eob_refs = " | ".join(c.ref() for c in candidates)
+        if any(usage[i] > 1 for i in key[1]):
+            status = "REVIEW_AMBIGUOUS"
+            flag("AMBIGUOUS_MATCH", first,
+                 "these EOB lines also match other statement lines; compare by hand",
+                 None, source=bill_refs)
+        elif diff > tolerance:
             status = "OVERBILLED"
-            flag("OVERBILLED", bill,
-                 f"bill asks {due} but EOB patient responsibility is {owed}",
-                 diff)
+            flag("OVERBILLED", first, f"statement asks {due} but EOB patient responsibility is {owed}",
+                 diff, source=bill_refs)
         elif diff < -tolerance:
             status = "BILL_BELOW_EOB"
-            flag("BILL_BELOW_EOB", bill,
-                 f"bill asks {due}, EOB says {owed}; may reflect a payment already made", -diff)
-        if bill.money["billed"] and candidates:
+            flag("BILL_BELOW_EOB", first,
+                 f"statement asks {due}, EOB says {owed}; may reflect a payment already made",
+                 -diff, source=bill_refs)
+        else:
+            status = "OK"
+        billed = sum((b.money["billed"] for b in members), ZERO)
+        if status != "REVIEW_AMBIGUOUS" and all(b.money["billed"] for b in members):
             eob_billed = sum((c.money["billed"] for c in candidates), ZERO)
-            if abs(eob_billed - bill.money["billed"]) > tolerance:
-                flag("BILLED_MISMATCH", bill,
-                     f"provider billed {bill.money['billed']} on statement but {eob_billed} on EOB")
+            if abs(eob_billed - billed) > tolerance:
+                flag("BILLED_MISMATCH", first,
+                     f"provider billed {billed} on statement but {eob_billed} on EOB",
+                     abs(eob_billed - billed), source=bill_refs)
         matches.append({
-            "bill_id": bill.raw["bill_id"],
-            "statement_date": bill.raw["statement_date"],
-            "service_date": bill.raw["service_date"],
-            "provider": bill.raw["provider"],
-            "patient": bill.raw["patient"],
+            "bill_id": first.raw["bill_id"],
+            "statement_date": first.raw["statement_date"],
+            "service_date": first.raw["service_date"],
+            "provider": first.raw["provider"],
+            "patient": first.raw["patient"],
+            "bill_lines": str(len(members)),
+            "eob_lines": str(len(candidates)),
             "amount_due": f"{due:.2f}",
             "eob_patient_resp": f"{owed:.2f}",
             "difference": f"{diff:.2f}",
             "status": status,
-            "method": method,
+            "method": group_method[key],
             "claim_ids": ";".join(sorted({c.raw.get("claim_id", "") for c in candidates})),
-            "bill_source": bill.ref(),
-            "eob_sources": " | ".join(c.ref() for c in candidates),
+            "bill_source": bill_refs,
+            "eob_sources": eob_refs,
         })
 
+    # ---- Accumulators from de-duplicated EOB lines, keyed by normalized patient.
     totals: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(lambda: ZERO))
-    for line in eob:
-        t = totals[line.raw["patient"]]
+    labels: dict[str, str] = {}
+    for line in active_eob:
+        labels.setdefault(line.patient_key, line.raw["patient"])
+        t = totals[line.patient_key]
         for col in EOB_MONEY:
             t[col] += line.money.get(col, ZERO)
     accumulators = {}
-    for patient, t in totals.items():
+    for patient_key, t in totals.items():
+        patient = labels[patient_key]
         acc = {k: f"{v:.2f}" for k, v in t.items()}
         if args.deductible is not None:
-            ded = Decimal(str(args.deductible))
+            ded = args.deductible
             acc["deductible_remaining"] = f"{max(ded - t['deductible_applied'], ZERO):.2f}"
             if t["deductible_applied"] > ded + tolerance:
                 exceptions.append({"code": "DEDUCTIBLE_EXCEEDED", "kind": "summary",
                                    "patient": patient, "amount": f"{t['deductible_applied'] - ded:.2f}",
                                    "detail": f"deductible applied {t['deductible_applied']} exceeds plan deductible {ded}"})
         if args.oop_max is not None:
-            oop = Decimal(str(args.oop_max))
+            oop = args.oop_max
             acc["oop_remaining"] = f"{max(oop - t['patient_resp'], ZERO):.2f}"
             if t["patient_resp"] > oop + tolerance:
                 exceptions.append({"code": "OOP_MAX_EXCEEDED", "kind": "summary",
@@ -365,9 +473,9 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
-    match_cols = ["bill_id", "statement_date", "service_date", "provider", "patient", "amount_due",
-                  "eob_patient_resp", "difference", "status", "method", "claim_ids",
-                  "bill_source", "eob_sources"]
+    match_cols = ["bill_id", "statement_date", "service_date", "provider", "patient", "bill_lines",
+                  "eob_lines", "amount_due", "eob_patient_resp", "difference", "status", "method",
+                  "claim_ids", "bill_source", "eob_sources"]
     exc_cols = ["code", "kind", "patient", "service_date", "provider", "cpt", "claim_id", "bill_id",
                 "amount", "detail", "source"]
     with (out / "matches.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -384,14 +492,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     summary = {
         "as_of": as_of.isoformat(),
         "eob_lines": len(eob),
+        "eob_lines_used": len(active_eob),
         "bill_lines": len(bills),
-        "matched_bill_lines": len(matches),
+        "bill_lines_used": len(active_bills),
+        "match_groups": len(matches),
         "exceptions": dict(sorted(counts.items())),
         "accumulators": accumulators,
         "warnings": [e for e in eob_errs + bill_errs if is_warning(e)],
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    print(f"RECONCILE=PASS matched={len(matches)} exceptions={len(exceptions)} out={out}")
+    print(f"RECONCILE=PASS groups={len(matches)} exceptions={len(exceptions)} out={out}")
     return 0
 
 
@@ -402,24 +512,27 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--eob", type=Path, required=True)
     v.add_argument("--bills", type=Path)
     v.add_argument("--aliases", type=Path)
-    v.add_argument("--tolerance", default="1.00")
+    v.add_argument("--tolerance", type=money_arg, default=Decimal("1.00"))
     v.set_defaults(func=cmd_validate)
     r = sub.add_parser("run", help="reconcile bills against EOB lines")
     r.add_argument("--eob", type=Path, required=True)
     r.add_argument("--bills", type=Path, required=True)
     r.add_argument("--out", type=Path, required=True)
-    r.add_argument("--as-of")
+    r.add_argument("--as-of", type=date_arg, help="report date, YYYY-MM-DD (default: today)")
     r.add_argument("--no-eob-days", type=int, default=45)
-    r.add_argument("--tolerance", default="1.00")
+    r.add_argument("--tolerance", type=money_arg, default=Decimal("1.00"))
     r.add_argument("--aliases", type=Path)
-    r.add_argument("--deductible", type=Decimal)
-    r.add_argument("--oop-max", type=Decimal)
+    r.add_argument("--deductible", type=money_arg)
+    r.add_argument("--oop-max", type=money_arg)
     r.set_defaults(func=cmd_run)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if getattr(args, "no_eob_days", 0) < 0:
+        print("ERROR --no-eob-days must be 0 or more", file=sys.stderr)
+        return 2
     try:
         return args.func(args)
     except InputError as exc:

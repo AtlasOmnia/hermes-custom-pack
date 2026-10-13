@@ -13,7 +13,7 @@ Built for an r/hermesagent Operator Lab request. It's designed to run with a loc
 5. **Reconcile**: `reconcile.py run` writes `matches.csv`, `exceptions.csv`, and `summary.json`.
 6. **Review**: Hermes summarizes exceptions by dollar amount and drafts inquiries. You decide and send.
 
-Exceptions it reports: `OVERBILLED`, `NO_EOB`, `NO_EOB_PENDING`, `BILLED_MISMATCH`, `DUPLICATE_CLAIM`, `DUPLICATE_CHARGE`, `EOB_MATH`, `DEDUCTIBLE_EXCEEDED`, `OOP_MAX_EXCEEDED`, `BILL_BELOW_EOB`. See `references/exception-codes.md`.
+It flags overbilling, missing EOBs, claim numbers the insurer doesn't have, duplicate claims and charges, EOBs loaded twice, ambiguous matches it refuses to guess, EOB arithmetic errors, and deductible or out-of-pocket overruns. Multi-line claims are compared as a group, so a statement with one row per procedure reconciles correctly. See `references/exception-codes.md`.
 
 ## What it includes
 
