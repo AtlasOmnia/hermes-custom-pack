@@ -11,12 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
-    test_dirs = sorted(path for path in (ROOT / "skills").glob("*/tests") if path.is_dir())
+    roots = (ROOT / "skills", ROOT / "community" / "skills")
+    test_dirs = sorted(
+        path for root in roots if root.is_dir() for path in root.glob("*/tests") if path.is_dir()
+    )
     if not test_dirs:
         print("ERROR: no skill test directories found")
         return 1
     for test_dir in test_dirs:
-        package = test_dir.parent.name
+        package = test_dir.parent.relative_to(ROOT).as_posix()
         print(f"TEST_PACKAGE={package}", flush=True)
         result = subprocess.run(
             [sys.executable, "-m", "unittest", "discover", "-s", str(test_dir), "-v"],

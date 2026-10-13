@@ -30,7 +30,7 @@ Exceptions it reports: `OVERBILLED`, `NO_EOB`, `NO_EOB_PENDING`, `BILLED_MISMATC
 ```bash
 git clone https://github.com/AtlasOmnia/hermes-agent-custom-pack.git
 mkdir -p ~/.hermes/skills/productivity/medical-bill-reconciliation
-cp -R hermes-agent-custom-pack/skills/medical-bill-reconciliation/. \
+cp -R hermes-agent-custom-pack/community/skills/medical-bill-reconciliation/. \
   ~/.hermes/skills/productivity/medical-bill-reconciliation/
 pip install pdfplumber        # for the extractor
 # optional, for scanned pages: brew install ocrmypdf  (or apt install ocrmypdf)
@@ -42,7 +42,7 @@ Windows PowerShell:
 git clone https://github.com/AtlasOmnia/hermes-agent-custom-pack.git
 $dest = Join-Path $HOME ".hermes\skills\productivity\medical-bill-reconciliation"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-Copy-Item -Recurse -Force ".\hermes-agent-custom-pack\skills\medical-bill-reconciliation\*" $dest
+Copy-Item -Recurse -Force ".\hermes-agent-custom-pack\community\skills\medical-bill-reconciliation\*" $dest
 pip install pdfplumber
 ```
 

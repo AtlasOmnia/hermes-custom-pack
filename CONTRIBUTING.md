@@ -7,6 +7,7 @@ Contributions that improve portability, verification, safety, or current Hermes 
 Use the appropriate directory:
 
 - `skills/<name>/` for installable Hermes skills;
+- `community/skills/<name>/` and `community/workflows/<name>.md` for skills and guides built for r/hermesagent requests (see `community/README.md`);
 - `plugins/<name>/` for Hermes plugins;
 - `integrations/<name>/` for external-service or application bridges;
 - `scripts/` for genuinely shared standalone utilities.

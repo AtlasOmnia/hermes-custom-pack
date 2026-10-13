@@ -13,6 +13,18 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
+# Packages built in response to community (Reddit) requests live in their own section
+# but follow exactly the same package contract as skills/.
+SKILL_ROOTS = (SKILLS, ROOT / "community" / "skills")
+COMMUNITY_WORKFLOWS = ROOT / "community" / "workflows"
+WORKFLOW_REQUIRED_HEADINGS = (
+    "## Request",
+    "## Approach",
+    "## Steps",
+    "## Human Gates",
+    "## Verification",
+)
+SOURCE_THREAD_RE = re.compile(r"(?mi)^\*\*Source thread:\*\*\s+https://(www\.)?reddit\.com/r/\S+")
 RECOMMENDED_HEADINGS = (
     "## Overview",
     "## When to Use",
@@ -114,8 +126,46 @@ def validate_skill(path: Path) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+def validate_workflow(path: Path) -> list[str]:
+    """Community workflow guides are prose, so only their shape is checked."""
+    errors: list[str] = []
+    content = path.read_text(encoding="utf-8")
+    if not content.startswith("# "):
+        errors.append("must start with a '# ' title")
+    if not SOURCE_THREAD_RE.search(content):
+        errors.append("missing '**Source thread:** https://www.reddit.com/r/...' line")
+    lower = content.lower()
+    for heading in WORKFLOW_REQUIRED_HEADINGS:
+        if heading.lower() not in lower:
+            errors.append(f"missing required heading: {heading}")
+    if DANGLING_SCRUB_RE.search(content):
+        errors.append("dangling scrub remnant found: 'see ;'")
+    return errors
+
+
+def validate_workflows() -> int:
+    if not COMMUNITY_WORKFLOWS.is_dir():
+        return 0
+    guides = sorted(
+        p for p in COMMUNITY_WORKFLOWS.glob("*.md")
+        if p.name.lower() != "readme.md" and not p.name.startswith("_")
+    )
+    failures = 0
+    for guide in guides:
+        errors = validate_workflow(guide)
+        if errors:
+            failures += 1
+            for error in errors:
+                print(f"ERROR: {guide.relative_to(ROOT)}: {error}")
+        else:
+            print(f"WORKFLOW_VALIDATION=PASS path={guide.relative_to(ROOT)}")
+    status = "FAIL" if failures else "PASS"
+    print(f"WORKFLOW_COLLECTION={status} workflows={len(guides)} failures={failures}")
+    return failures
+
+
 def main() -> int:
-    paths = sorted(SKILLS.rglob("SKILL.md"))
+    paths = sorted(path for root in SKILL_ROOTS if root.is_dir() for path in root.rglob("SKILL.md"))
     if not paths:
         print("ERROR: no skill packages found")
         return 1
@@ -130,8 +180,9 @@ def main() -> int:
                 print(f"ERROR: {path.relative_to(ROOT)}: {error}")
         else:
             print(f"SKILL_VALIDATION=PASS path={path.relative_to(ROOT)} chars={len(path.read_text(encoding='utf-8'))}")
-    if failures:
-        print(f"COLLECTION_VALIDATION=FAIL skills={len(paths)} failures={failures}")
+    workflow_failures = validate_workflows()
+    if failures or workflow_failures:
+        print(f"COLLECTION_VALIDATION=FAIL skills={len(paths)} failures={failures} workflow_failures={workflow_failures}")
         return 1
     print(f"COLLECTION_VALIDATION=PASS skills={len(paths)}")
     return 0

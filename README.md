@@ -65,7 +65,6 @@ This repository is unofficial and is not affiliated with or endorsed by Nous Res
 | [marketing-collateral-design](skills/marketing-collateral-design/) | Use when designing, recreating, critiquing, or exporting static marketing collateral such as flyers, social graphics, postcards, brochures, business cards, print ads, and promotional one-sheets. Covers reference decomposition, original art direction, deterministic HTML/CSS/SVG typesetting, separate AI imagery, print/social production, and rendered visual QA | Ready |
 | [marketplace-purchase-vetting](skills/marketplace-purchase-vetting/) | Search/discover AND vet Facebook Marketplace/Craigslist/private-party purchases. Two modes: find the best live options in the area within a budget, then vet promising candidates for too-good-to-be-true risk. Covers vehicles, boats, trailers, equipment, and other high-dollar local listings | Ready |
 | [meal-tracker](skills/meal-tracker/) | Track meals and calories from a photo or text description. Vision-based portion estimates, daily calorie/macro budget, markdown food log | Ready |
-| [medical-bill-reconciliation](skills/medical-bill-reconciliation/) | Reconcile medical bills against insurer EOBs: offline PDF extraction with source-page tracing, overbilling/duplicate/missing-EOB detection, deductible and out-of-pocket tracking, and human-sent draft inquiries | Ready |
 | [messaging-gateway-troubleshooting](skills/messaging-gateway-troubleshooting/) | Troubleshoot Hermes messaging gateway platform adapters, webhooks, authorization, delivery, and loop-prevention behavior | Ready |
 | [meta-business-posting](skills/meta-business-posting/) | Publish posts to a Facebook Page through the agent's own logged-in browser session or the Meta Graph API. Account-agnostic; no credentials in the skill | Ready |
 | [mnemosyne-maintenance](skills/mnemosyne-maintenance/) | Upgrade, troubleshoot, and maintain Mnemosyne memory provider — version mismatches, slow/hung consolidation, missing embeddings, import shadowing | Ready |
@@ -89,6 +88,16 @@ This repository is unofficial and is not affiliated with or endorsed by Nous Res
 | [vault-organization](skills/vault-organization/) | Structure a new Obsidian vault (PARA taxonomy, MOCs, starter folder tree) and audit/clean up/reorganize an existing one — identify bloat, consolidate duplicates, remove empty shells, update MOCs and stale references | Ready |
 | [xurl](skills/xurl/) | X/Twitter via xurl CLI: post, search, DM, media, v2 API | Ready |
 Additional packages will be added only after they are generalized, tested, and cleared of private configuration.
+
+## Community builds
+
+Skills and workflow guides built for real requests from [r/hermesagent](https://www.reddit.com/r/hermesagent/), mostly the Operator Lab threads. See [community/](community/) for the full index.
+
+| Package | Purpose | Type |
+|---|---|---|
+| [medical-bill-reconciliation](community/skills/medical-bill-reconciliation/) | Reconcile medical bills against insurer EOBs: offline PDF extraction with source-page tracing, overbilling, duplicate, and missing-EOB detection, deductible and out-of-pocket tracking, human-sent draft inquiries | Skill |
+| [plaud-meeting-timeline](community/workflows/plaud-meeting-timeline.md) | Plaud summaries + calendar into a per-customer timeline and open next-step list | Workflow |
+| [godot-gdscript-check-loop](community/workflows/godot-gdscript-check-loop.md) | Local-model GDScript with Godot's headless parse check in the loop | Workflow |
 
 ## Related projects
 
@@ -119,6 +128,7 @@ Start a new Hermes session after installation so the skill registry is refreshed
 ```text
 hermes-agent-custom-pack/
 ├── skills/          # installable Hermes SKILL.md packages
+├── community/       # skills and workflow guides built for r/hermesagent requests
 ├── plugins/         # Hermes plugins when added
 ├── integrations/    # external-service and application integrations
 ├── scripts/         # standalone utilities shared across packages
