@@ -9,7 +9,7 @@ Each entry starts from a specific person's request, gets generalized so it works
 | Request | Built | Type | Source | Status |
 |---|---|---|---|---|
 | Reconcile medical bills against insurance EOBs, track deductible and out-of-pocket | [medical-bill-reconciliation](skills/medical-bill-reconciliation/) | Skill + scripts | [Operator Lab #1](https://www.reddit.com/r/hermesagent/comments/1wyimkz/operator_lab_whats_one_real_task_you_want_hermes/) | Ready |
-| Turn Plaud meeting notes + calendar into a per-customer timeline with next steps | [plaud-meeting-timeline](workflows/plaud-meeting-timeline.md) | Workflow guide | [Operator Lab #1](https://www.reddit.com/r/hermesagent/comments/1wyimkz/operator_lab_whats_one_real_task_you_want_hermes/) | Ready |
+| Turn Plaud meeting notes + calendar into a per-customer timeline with next steps | [plaud-meeting-timeline](workflows/plaud-meeting-timeline.md) | Workflow guide | [Operator Lab #1](https://www.reddit.com/r/hermesagent/comments/1wyimkz/operator_lab_whats_one_real_task_you_want_hermes/) | Draft |
 | Get GDScript that drops into a Godot project, on a local model | [godot-gdscript-check-loop](workflows/godot-gdscript-check-loop.md) | Workflow guide | [Operator Lab #1](https://www.reddit.com/r/hermesagent/comments/1wyimkz/operator_lab_whats_one_real_task_you_want_hermes/) | Ready |
 
 ## Skills vs workflows
