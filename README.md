@@ -1,5 +1,7 @@
 # Hermes Agent Custom Pack
 
+> Part of the AtlasOmnia Hermes Agent toolset → [hermesagenttools.com/hermes-agent/](https://hermesagenttools.com/hermes-agent/)
+
 An independent pack of practical skills, plugins, integrations, scripts, and utilities created by AtlasOmnia for [Hermes Agent](https://github.com/NousResearch/hermes-agent).
 
 These projects come from workflows that have been used, revised, and tested in real Hermes installations. Each package should be installable on its own, documented with explicit verification steps, and safe to inspect before use.
